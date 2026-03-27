@@ -16,14 +16,12 @@ uses
   Dialogs,
   SDL3,
   SDL3_TTF,
-  //SDL_mixer,
+  SDL3_mixer,
   iniFiles,
   SDL3_image,
   kys_gfx,
   kys_battle,
-  kys_main,
-  bass,
-  bassmidi;
+  kys_main;
 
 function EventFilter(p: pointer; e: PSDL_Event): boolean; cdecl;
 
@@ -192,6 +190,51 @@ implementation
 
 uses kys_event;
 
+var
+  gMixer: MIX_Mixer = nil;
+  MusicTrack: MIX_Track = nil;
+  SfxTracks: array[0..9] of MIX_Track;
+  SfxNextTrack: integer = 0;
+
+function EnsureMixerCreated: boolean;
+var
+  spec: TSDL_AudioSpec;
+begin
+  Result := False;
+  if gMixer <> nil then
+    Exit(True);
+  if not MIX_Init() then
+    Exit(False);
+  spec.freq := 22050;
+  spec.format := SDL_AUDIO_S16;
+  spec.channels := 2;
+  gMixer := MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, @spec);
+  Result := gMixer <> nil;
+end;
+
+function EnsureTrackForAudio(var track: MIX_Track; audio: MIX_Audio): boolean;
+begin
+  Result := MIX_SetTrackAudio(track, audio);
+end;
+
+function AcquireSfxTrack(audio: MIX_Audio): MIX_Track;
+var
+  idx: integer;
+begin
+  Result := nil;
+  if audio = nil then
+    Exit;
+
+  idx := SfxNextTrack;
+  Inc(SfxNextTrack);
+  if SfxNextTrack > High(SfxTracks) then
+    SfxNextTrack := Low(SfxTracks);
+
+  if not EnsureTrackForAudio(SfxTracks[idx], audio) then
+    Exit;
+  Result := SfxTracks[idx];
+end;
+
 function EventFilter(p: pointer; e: PSDL_Event): boolean; cdecl;
 begin
   Result := True;
@@ -216,61 +259,80 @@ procedure InitialMusic;
 var
   i: integer;
   str: ansistring;
-  sf: BASS_MIDI_FONT;
-  Flag: longword;
+
+  function LoadMid(filename: ansistring): MIX_Audio;
+  var
+    id: SDL_PropertiesID;
+    io: PSDL_IOStream;
+    sf2: ansistring;
+  begin
+    id := SDL_CreateProperties();
+    io := SDL_IOFromFile(PAnsiChar(filename), 'rb');
+    SDL_SetPointerProperty(id, MIX_PROP_AUDIO_LOAD_IOSTREAM_POINTER, io);
+    SDL_SetStringProperty(id, MIX_PROP_AUDIO_DECODER_STRING, 'fluidsynth');
+    sf2 := AppPath + 'music/mid.sf2';
+    SDL_SetStringProperty(id, 'SDL_mixer.decoder.fluidsynth.soundfont_path', PAnsiChar(sf2));
+    Result := MIX_LoadAudioWithProperties(id);
+    SDL_CloseIO(io);
+    SDL_DestroyProperties(id);
+  end;
+
 begin
-  sf.font := BASS_MIDI_FontInit(pansichar(AppPath + 'music/mid.sf2'), 0);
-  BASS_MIDI_StreamSetFonts(0, sf, 1);
-  sf.preset := -1; // use all presets
-  sf.bank := 0;
-  Flag := 0;
-  //if SOUND3D = 1 then
-  //Flag := BASS_SAMPLE_3D or Flag;
+  if not EnsureMixerCreated then
+    Exit;
+
+  MusicTrack := MIX_CreateTrack(gMixer);
+  for i := Low(SfxTracks) to High(SfxTracks) do
+    SfxTracks[i] := MIX_CreateTrack(gMixer);
+  SfxNextTrack := Low(SfxTracks);
 
   for i := low(Music) to high(Music) do
   begin
-    str := AppPath + 'music/' + IntToStr(i) + '.mp3';
-    if fileexists(pansichar(str)) then
+    if Music[i] <> nil then
     begin
-      try
-        Music[i] := BASS_StreamCreateFile(False, pansichar(str), 0, 0, 0);
-      finally
+      MIX_DestroyAudio(Music[i]);
+      Music[i] := nil;
+    end;
 
-      end;
-    end
+    str := AppPath + 'music/' + IntToStr(i) + '.mp3';
+    if fileexists(PAnsiChar(str)) then
+      Music[i] := MIX_LoadAudio(nil, PAnsiChar(str), False)
     else
     begin
       str := AppPath + 'music/' + IntToStr(i) + '.mid';
-      if fileexists(pansichar(str)) then
-      begin
-        try
-          Music[i] := BASS_MIDI_StreamCreateFile(False, pansichar(str), 0, 0, 0, 0);
-          BASS_MIDI_StreamSetFonts(Music[i], sf, 1);
-        finally
-
-        end;
-      end
+      if fileexists(PAnsiChar(str)) then
+        Music[i] := LoadMid(str)
       else
-        Music[i] := 0;
+        Music[i] := nil;
     end;
   end;
 
   for i := low(ESound) to high(ESound) do
   begin
     str := AppPath + format('sound/e%.3d', [i]) + '.wav';
-    if fileexists(pansichar(str)) then
-      ESound[i] := BASS_SampleLoad(False, pansichar(str), 0, 0, 1, Flag)
+    if ESound[i] <> nil then
+    begin
+      MIX_DestroyAudio(ESound[i]);
+      ESound[i] := nil;
+    end;
+    if fileexists(PAnsiChar(str)) then
+      ESound[i] := MIX_LoadAudio(nil, PAnsiChar(str), False)
     else
-      ESound[i] := 0;
+      ESound[i] := nil;
     //showmessage(inttostr(esound[i]));
   end;
   for i := low(ASound) to high(ASound) do
   begin
     str := AppPath + format('sound/atk%.3d', [i]) + '.wav';
-    if fileexists(pansichar(str)) then
-      ASound[i] := BASS_SampleLoad(False, pansichar(str), 0, 0, 1, Flag)
+    if ASound[i] <> nil then
+    begin
+      MIX_DestroyAudio(ASound[i]);
+      ASound[i] := nil;
+    end;
+    if fileexists(PAnsiChar(str)) then
+      ASound[i] := MIX_LoadAudio(nil, PAnsiChar(str), False)
     else
-      ASound[i] := 0;
+      ASound[i] := nil;
   end;
 
 end;
@@ -278,36 +340,22 @@ end;
 //播放mp3音乐
 procedure PlayMP3(MusicNum, times: integer; frombeginning: integer = 1); overload;
 var
-  repeatable: boolean;
-  //nowmusic: HSTREAM;
+  loops: integer;
 begin
-  if times = -1 then
-    repeatable := True
-  else
-    repeatable := False;
+  if not EnsureMixerCreated then
+    Exit;
+  if times = -1 then loops := -1 else loops := 0;
   try
     if (MusicNum >= Low(Music)) and (MusicNum <= High(Music)) and (MusicVOLUME > 0) then
-      if Music[MusicNum] <> 0 then
+      if Music[MusicNum] <> nil then
       begin
-        //BASS_ChannelSlideAttribute(Music[nowmusic], BASS_ATTRIB_VOL, 0, 1000);
-        if (nowmusic >= Low(Music)) and (nowmusic <= High(Music)) then
-        begin
-          BASS_ChannelStop(Music[nowmusic]);
-          if frombeginning = 1 then
-            BASS_ChannelSetPosition(Music[nowmusic], 0, BASS_POS_BYTE);
-        end;
-        BASS_ChannelSetAttribute(Music[MusicNum], BASS_ATTRIB_VOL, MusicVOLUME / 100.0);
-        {if SOUND3D = 1 then
-        begin
-          //BASS_SetEAXParameters(EAX_ENVIRONMENT_UNDERWATER, -1, 0, 0);
-          BASS_Apply3D();
-        end;}
-
-        if repeatable then
-          BASS_ChannelFlags(Music[MusicNum], BASS_SAMPLE_LOOP, BASS_SAMPLE_LOOP)
-        else
-          BASS_ChannelFlags(Music[MusicNum], 0, BASS_SAMPLE_LOOP);
-        BASS_ChannelPlay(Music[MusicNum], False);
+        MIX_StopTrack(MusicTrack, 0);
+        MIX_SetTrackAudio(MusicTrack, Music[MusicNum]);
+        if frombeginning = 1 then
+          MIX_SetTrackPlaybackPosition(MusicTrack, 0);
+        MIX_SetTrackGain(MusicTrack, MusicVOLUME / 100.0);
+        MIX_SetTrackLoops(MusicTrack, loops);
+        MIX_PlayTrack(MusicTrack, 0);
         nowmusic := musicnum;
       end;
   finally
@@ -319,33 +367,26 @@ end;
 //停止当前播放的音乐
 procedure StopMP3;
 begin
-  BASS_ChannelStop(Music[nowmusic]);
-  //BASS_ChannelSetPosition(Music, 0, BASS_POS_BYTE);
+  if MusicTrack <> nil then
+    MIX_StopTrack(MusicTrack, 0);
 end;
 
 //播放wav音效
 procedure PlaySoundE(SoundNum, times: integer); overload;
 var
-  ch: HCHANNEL;
-  repeatable: boolean;
+  loops: integer;
+  track: MIX_Track;
 begin
-  if times = -1 then
-    repeatable := True
-  else
-    repeatable := False;
+  if times = -1 then loops := -1 else loops := 0;
   if (SoundNum >= 0) and (SoundNum < length(Esound)) and (SoundVOLUME > 0) then
-    if Esound[SoundNum] <> 0 then
+    if Esound[SoundNum] <> nil then
     begin
-      //Mix_VolumeChunk(Esound[SoundNum], Volume);
-      //Mix_PlayChannel(-1, Esound[SoundNum], 0);
-      BASS_SampleStop(Esound[soundnum]);
-      ch := BASS_SampleGetChannel(Esound[soundnum], False);
-      BASS_ChannelSetAttribute(ch, BASS_ATTRIB_VOL, SoundVolume / 128.0);
-      if repeatable then
-        BASS_ChannelFlags(ch, BASS_SAMPLE_LOOP, BASS_SAMPLE_LOOP)
-      else
-        BASS_ChannelFlags(ch, 0, BASS_SAMPLE_LOOP);
-      BASS_ChannelPlay(ch, repeatable);
+      track := AcquireSfxTrack(Esound[SoundNum]);
+      if track = nil then
+        Exit;
+      MIX_SetTrackGain(track, SoundVolume / 100.0);
+      MIX_SetTrackLoops(track, loops);
+      MIX_PlayTrack(track, 0);
     end;
 
 end;
@@ -364,26 +405,19 @@ end;
 
 procedure PlaySoundA(SoundNum, times: integer);
 var
-  ch: HCHANNEL;
-  repeatable: boolean;
+  loops: integer;
+  track: MIX_Track;
 begin
-  if times = -1 then
-    repeatable := True
-  else
-    repeatable := False;
+  if times = -1 then loops := -1 else loops := 0;
   if (SoundNum >= Low(Asound)) and (SoundNum <= High(Asound)) and (SoundVOLUME > 0) then
-    if Asound[SoundNum] <> 0 then
+    if Asound[SoundNum] <> nil then
     begin
-      //Mix_VolumeChunk(Esound[SoundNum], Volume);
-      //Mix_PlayChannel(-1, Esound[SoundNum], 0);
-      BASS_SampleStop(Esound[soundnum]);
-      ch := BASS_SampleGetChannel(Asound[soundnum], False);
-      BASS_ChannelSetAttribute(ch, BASS_ATTRIB_VOL, SoundVOLUME / 128.0);
-      if repeatable then
-        BASS_ChannelFlags(ch, BASS_SAMPLE_LOOP, BASS_SAMPLE_LOOP)
-      else
-        BASS_ChannelFlags(ch, 0, BASS_SAMPLE_LOOP);
-      BASS_ChannelPlay(ch, repeatable);
+      track := AcquireSfxTrack(Asound[SoundNum]);
+      if track = nil then
+        Exit;
+      MIX_SetTrackGain(track, SoundVolume / 100.0);
+      MIX_SetTrackLoops(track, loops);
+      MIX_PlayTrack(track, 0);
     end;
 
 end;
@@ -634,6 +668,50 @@ begin
   if (px - xs + w >= xx) and (px - xs < xx + xw) and (py - ys + h >= yy) and (py - ys < yy + yh) then
     Result := True;
 
+end;
+
+function BlendByte100(src, dst: byte; percent: integer): byte; inline;
+begin
+  Result := (percent * src + (100 - percent) * dst) div 100;
+end;
+
+function BlendByte255(src, dst: byte; alpha: integer): byte; inline;
+begin
+  Result := (alpha * src + (255 - alpha) * dst) div 255;
+end;
+
+procedure BlendRGB255(var r, g, b: byte; srcR, srcG, srcB: byte; alpha: integer); inline;
+begin
+  r := BlendByte255(srcR, r, alpha);
+  g := BlendByte255(srcG, g, alpha);
+  b := BlendByte255(srcB, b, alpha);
+end;
+
+procedure ApplyScenePalette(var col1, col2, col3: byte); inline;
+begin
+  if (where <> 1) then
+    Exit;
+
+  case Rscene[curscene].Pallet of
+    1:
+      begin
+        col1 := (69 * col1) div 100;
+        col2 := (73 * col2) div 100;
+        col3 := (75 * col3) div 100;
+      end;
+    2:
+      begin
+        col1 := (85 * col1) div 100;
+        col2 := (75 * col2) div 100;
+        col3 := (30 * col3) div 100;
+      end;
+    3:
+      begin
+        col1 := (25 * col1) div 100;
+        col2 := (68 * col2) div 100;
+        col3 := (45 * col3) div 100;
+      end;
+  end;
 end;
 //RLE8图片绘制子程，所有相关子程均对此封装
 
@@ -970,7 +1048,7 @@ var
   c: uint32;
   pix1, pix2, pix3, col1, col2, col3, col4: byte;
 begin
-  if num >= 3 then
+  if (num >= 3) and (num <= high(Scenepic)) then
   begin
     b := 0;
     x1 := px - Scenepic[num].x + 1;
@@ -1004,32 +1082,10 @@ begin
             col2 := (c shr 8) and $FF;
             col3 := c and $FF;
 
-            if (where = 1) then
-            begin
-              if (Rscene[curscene].Pallet = 1) then //调色板1
-              begin
-                col1 := (69 * col1) div 100;
-                col2 := (73 * col2) div 100;
-                col3 := (75 * col3) div 100;
-              end
-              else if (Rscene[curscene].Pallet = 2) then //调色板2
-              begin
-                col1 := (85 * col1) div 100;
-                col2 := (75 * col2) div 100;
-                col3 := (30 * col3) div 100;
-              end
-              else if (Rscene[curscene].Pallet = 3) then //调色板3
-              begin
-                col1 := (25 * col1) div 100;
-                col2 := (68 * col2) div 100;
-                col3 := (45 * col3) div 100;
-              end;
-            end;
+            ApplyScenePalette(col1, col2, col3);
             if (alpha = 0) and (Mask = 1) then MaskArray[x1 + i1, y1 + i2] := 1;
 
-            pix1 := (alpha * col1 + (255 - alpha) * pix1) div 255;
-            pix2 := (alpha * col2 + (255 - alpha) * pix2) div 255;
-            pix3 := (alpha * col3 + (255 - alpha) * pix3) div 255;
+            BlendRGB255(pix1, pix2, pix3, col1, col2, col3, alpha);
             //   c := 0 ;
 
             p := Pointer(uint32(screen.pixels) + (y1 + i2) * screen.pitch + (x1 + i1) * bpp);
@@ -1066,9 +1122,7 @@ begin
               pix2 := (pix shr 8) and $FF;
               pix3 := pix and $FF;
 
-              pix1 := (alpha * col1 + (255 - alpha) * pix1) div 255;
-              pix2 := (alpha * col2 + (255 - alpha) * pix2) div 255;
-              pix3 := (alpha * col3 + (255 - alpha) * pix3) div 255;
+              BlendRGB255(pix1, pix2, pix3, col1, col2, col3, alpha);
 
             end
             else if (where = 1) and (rain >= 0) then //下雨
@@ -1149,7 +1203,7 @@ var
   c: uint32;
   pix1, pix2, pix3, col1, col2, col3: byte;
 begin
-  if num >= 3 then
+  if (num >= 3) and (num <= high(Scenepic)) then
   begin
     x1 := px - Scenepic[num].x + 1;
     y1 := py - Scenepic[num].y + 1;
@@ -1183,30 +1237,8 @@ begin
               col1 := (c shr 16) and $FF;
               col2 := (c shr 8) and $FF;
               col3 := c and $FF;
-              if (where = 1) then
-              begin
-                if (Rscene[curscene].Pallet = 1) then //调色板1
-                begin
-                  col1 := (69 * col1) div 100;
-                  col2 := (73 * col2) div 100;
-                  col3 := (75 * col3) div 100;
-                end
-                else if (Rscene[curscene].Pallet = 2) then //调色板2
-                begin
-                  col1 := (85 * col1) div 100;
-                  col2 := (75 * col2) div 100;
-                  col3 := (30 * col3) div 100;
-                end
-                else if (Rscene[curscene].Pallet = 3) then //调色板3
-                begin
-                  col1 := (25 * col1) div 100;
-                  col2 := (68 * col2) div 100;
-                  col3 := (45 * col3) div 100;
-                end;
-              end;
-              pix1 := (alpha * col1 + (255 - alpha) * pix1) div 255;
-              pix2 := (alpha * col2 + (255 - alpha) * pix2) div 255;
-              pix3 := (alpha * col3 + (255 - alpha) * pix3) div 255;
+                ApplyScenePalette(col1, col2, col3);
+                BlendRGB255(pix1, pix2, pix3, col1, col2, col3, alpha);
               c := pix1 shl 16 + pix2 shl 8 + pix3 shl 0 + AMASK;
               SceneImg[i1 + x1, i2 + y1] := c;
             end;
@@ -4776,8 +4808,8 @@ begin
           if menu >= 0 then
           begin
             MusicVolume := menu * 16;
-            //Mix_VolumeMusic(MusicVolume);
-            BASS_ChannelSetAttribute(Music[nowmusic], BASS_ATTRIB_VOL, MusicVOLUME / 128.0);
+            if MusicTrack <> nil then
+              MIX_SetTrackGain(MusicTrack, MusicVOLUME / 100.0);
             Kys_ini.WriteInteger('constant', 'MUSIC_VOLUME', MusicVolume);
           end;
         end;
@@ -4794,8 +4826,8 @@ begin
           if (xm >= 112) and (xm < 640) and (ym > 251) and (ym < 331) then
           begin
             MusicVolume := menu * 16;
-            //Mix_VolumeMusic(MusicVolume);
-            BASS_ChannelSetAttribute(Music[nowmusic], BASS_ATTRIB_VOL, MusicVOLUME / 128.0);
+            if MusicTrack <> nil then
+              MIX_SetTrackGain(MusicTrack, MusicVOLUME / 100.0);
             Kys_ini.WriteInteger('constant', 'MUSIC_VOLUME', MusicVolume);
           end;
         end;

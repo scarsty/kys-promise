@@ -36,11 +36,10 @@ uses
   Dialogs,
   SDL3,
   SDL3_ttf,
-  //SDL_mixer,
+  SDL3_mixer,
   SDL3_image,
   iniFiles,
   //Lua52,
-  bass,
   fileinfo;
 
 type
@@ -464,12 +463,9 @@ var
   GameArray: array of array of integer;
   GameSpeed: integer = 10;
   MusicVolume: integer = 64;
-  //Music: array[0..99] of PMix_music;
-  // ESound: array[0..99] of PMix_Chunk;
-  // ASound: array[0..99] of PMix_Chunk;
-  Music: array[0..109] of HSTREAM;
-  ESound: array[0..186] of HSAMPLE;
-  ASound: array[0..99] of HSAMPLE;
+  Music: array[0..109] of MIX_Audio;
+  ESound: array[0..186] of MIX_Audio;
+  ASound: array[0..99] of MIX_Audio;
   nowmusic: integer;
 
   //战斗用变量
@@ -599,8 +595,7 @@ begin
   //初始化音频系统
 
   //SDL_Init(SDL_INIT_AUDIO);
-  //Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT, 2, 8192);
-  BASS_Init(-1, 22050, 0, 0, nil);
+  MIX_Init();
   InitialMusic;
 
   //初始化视频系统
@@ -650,6 +645,7 @@ begin
   TTF_CloseFont(font);
   TTF_CloseFont(engfont);
   TTF_Quit;
+  MIX_Quit;
   SDL_Quit;
   halt(1);
   exit;
@@ -662,6 +658,7 @@ begin
   TTF_CloseFont(font);
   TTF_CloseFont(engfont);
   TTF_Quit;
+  MIX_Quit;
   SDL_Quit;
   halt(1);
   exit;
@@ -852,9 +849,7 @@ begin
   fileseek(idx, 0, 0);
   fileread(idx, HIdx[0], tnum * 4);
   fileclose(grp);
-  fileclose(idx);
-
-                  }
+  fileclose(idx);}
 
   if (FileExists(AppPath + Scene_file) { *Converted from FileExists*  }) then
   begin

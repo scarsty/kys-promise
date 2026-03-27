@@ -23,8 +23,7 @@
       <UseVersionInfo Value="True"/>
       <MajorVersionNr Value="1"/>
       <MinorVersionNr Value="22"/>
-      <RevisionNr Value="3"/>
-      <BuildNr Value="21"/>
+      <RevisionNr Value="4"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Release" Default="True"/>
@@ -47,23 +46,18 @@
             </SyntaxOptions>
           </Parsing>
           <CodeGeneration>
-            <SmartLinkUnit Value="True"/>
             <Checks>
               <StackChecks Value="True"/>
             </Checks>
             <Optimizations>
               <OptimizationLevel Value="0"/>
-              <VariablesInRegisters Value="True"/>
             </Optimizations>
           </CodeGeneration>
           <Linking>
             <Debugging>
               <DebugInfoType Value="dsDwarf2Set"/>
               <UseValgrind Value="True"/>
-              <StripSymbols Value="True"/>
-              <UseExternalDbgSyms Value="True"/>
             </Debugging>
-            <LinkSmart Value="True"/>
           </Linking>
         </CompilerOptions>
       </Item2>

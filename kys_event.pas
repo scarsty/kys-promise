@@ -21,8 +21,7 @@ uses
   //SDL_mixer,
   SDL3_image,
   kys_littlegame,
-  kys_main,
-  bass;
+  kys_main;
 
 //事件系统
 //在英文中, instruct通常不作为名词, swimmingfish在他的一份反汇编文件中大量使用
