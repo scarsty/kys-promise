@@ -1,4 +1,4 @@
-﻿#include "kys_main.h"
+#include "kys_main.h"
 
 #ifdef _WIN32
 #define NOMINMAX

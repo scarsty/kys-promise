@@ -1,4 +1,4 @@
-﻿#include "kys_gfx.h"
+#include "kys_gfx.h"
 
 #include <algorithm>
 #include <cstddef>

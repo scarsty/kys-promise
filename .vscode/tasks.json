@@ -1,44 +1,60 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Build Windows EXE",
-      "type": "shell",
-      "command": ".\\编译Windows_exe.bat nopause",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "group": "build"
-    },
-    {
-      "label": "Run Windows EXE",
-      "type": "shell",
-      "command": ".\\kys_promise.exe",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": "Build Windows EXE",
-      "problemMatcher": []
-    },
-    {
-      "label": "Build Android SO",
-      "type": "shell",
-      "command": ".\\编译Android_so.bat nopause",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": [],
-      "group": "build"
-    },
-    {
-      "label": "Build Android APK",
-      "type": "shell",
-      "command": "gradlew.bat assembleRelease",
-      "options": {
-        "cwd": "${workspaceFolder}/kys-promise-androidstudio"
-      },
-      "problemMatcher": []
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Windows EXE",
+			"type": "shell",
+			"command": ".\\编译Windows_exe.bat nopause",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Windows EXE",
+			"type": "shell",
+			"command": ".\\kys_promise.exe",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"dependsOn": "Build Windows EXE",
+			"problemMatcher": []
+		},
+		{
+			"label": "Build Android SO",
+			"type": "shell",
+			"command": ".\\编译Android_so.bat nopause",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Build Android APK",
+			"type": "shell",
+			"command": "gradlew.bat assembleRelease",
+			"options": {
+				"cwd": "${workspaceFolder}/kys-promise-androidstudio"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Build C++ x64 Debug",
+			"type": "shell",
+			"command": "& 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe' kys-promise-cpp.vcxproj /p:Configuration=Debug /p:Platform=x64 /m",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "Build C++ vcxproj",
+			"type": "shell",
+			"command": "\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe\" c\\kys-promise-cpp.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		}
+	]
 }
