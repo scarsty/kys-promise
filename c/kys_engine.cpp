@@ -1191,14 +1191,28 @@ void DrawVirtualKey()
 
 uint32 CheckBasicEvent()
 {
-    // TODO: 实现完整的事件检测循环
-    SDL_PollEvent(&event);
     switch (event.type)
     {
-    case SDL_EVENT_QUIT: return SDLK_ESCAPE;
-    case SDL_EVENT_KEY_DOWN: return event.key.key;
+    case SDL_EVENT_QUIT:
+        QuitConfirm();
+        return SDLK_ESCAPE;
+    case SDL_EVENT_WINDOW_RESIZED:
+        ResizeWindow(event.window.data1, event.window.data2);
+        return 0;
+    case SDL_EVENT_DID_ENTER_FOREGROUND:
+        PlayMP3(nowmusic, -1, 0);
+        return 0;
+    case SDL_EVENT_DID_ENTER_BACKGROUND:
+        StopMP3();
+        return 0;
+    case SDL_EVENT_KEY_UP:
+    case SDL_EVENT_KEY_DOWN:
+        if (event.key.key == SDLK_KP_ENTER)
+            event.key.key = SDLK_RETURN;
+        return event.key.key;
+    default:
+        return 0;
     }
-    return 0;
 }
 
 void QuitConfirm()
@@ -1208,7 +1222,13 @@ void QuitConfirm()
 
 void resetpallet()
 {
-    // 默认：复位到默认调色板
+    int paletteIndex = 0;
+    if (Where == 1 && CurScene >= 0 && CurScene < static_cast<int>(RScene.size()))
+    {
+        if (RScene[CurScene].Pallet >= 0 && RScene[CurScene].Pallet < 4)
+            paletteIndex = RScene[CurScene].Pallet;
+    }
+    std::memcpy(ACol, Col[paletteIndex], 768);
 }
 
 void resetpallet(int num)

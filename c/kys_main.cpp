@@ -446,31 +446,52 @@ void ReadFiles()
 }
 
 // ==== GetPngPic (FILE* overload) ====
-// Pascal 中 GetPngPic(grp: integer, num: integer) 中 grp 是文件句柄
-// 这里用 FILE* 重载
+// Pascal 文件格式:
+//   偏移 0: Count (int32, 条目总数)
+//   偏移 4..(Count+1)*4-1: 索引表, 每项 4 字节为该条目的结束偏移
+//   条目 num 的数据: 从 address 到 address+12+len
+//     4字节 x, 4字节 y, 4字节 black, 然后 len 字节 PNG 数据
 
 TPic GetPngPic(FILE* f, int num)
 {
     TPic result{};
     if (!f) return result;
 
-    int32_t offset = 0, len = 0;
-    // 每个 PNG 条目: 4字节偏移 + 4字节长度 + 数据
-    // 实际格式: 先总数(4字节), 然后每个条目:
-    //   4字节x, 4字节y, 4字节black, 4字节大小, 数据
-    int32_t x = 0, y = 0, black = 0, size = 0;
-    PasFileRead(f, &x, 4);
-    PasFileRead(f, &y, 4);
-    PasFileRead(f, &black, 4);
-    PasFileRead(f, &size, 4);
-    result.x = x;
-    result.y = y;
-    result.black = black;
-    if (size > 0)
+    // 读取总数
+    int32_t Count = 0;
+    fseek(f, 0, SEEK_SET);
+    fread(&Count, 4, 1, f);
+
+    // 读取结束偏移 (索引表中 num+1 位置)
+    int32_t endOffset = 0;
+    fseek(f, (num + 1) * 4, SEEK_SET);
+    fread(&endOffset, 4, 1, f);
+
+    // 读取起始偏移
+    int32_t address = 0;
+    if (num == 0)
+        address = (Count + 1) * 4;
+    else
     {
-        std::vector<uint8_t> buf(size);
-        PasFileRead(f, buf.data(), size);
-        result.pic = ReadPicFromByte(buf.data(), size);
+        fseek(f, num * 4, SEEK_SET);
+        fread(&address, 4, 1, f);
+    }
+
+    // 数据长度 = 结束偏移 - 起始偏移 - 12(x,y,black各4字节)
+    int32_t len = endOffset - address - 12;
+
+    // 定位到数据区，读取 x, y, black
+    fseek(f, address, SEEK_SET);
+    fread(&result.x, 4, 1, f);
+    fread(&result.y, 4, 1, f);
+    fread(&result.black, 4, 1, f);
+
+    // 读取 PNG 数据
+    if (len > 0)
+    {
+        std::vector<uint8_t> buf(len);
+        fread(buf.data(), 1, len, f);
+        result.pic = ReadPicFromByte(buf.data(), len);
     }
     return result;
 }
