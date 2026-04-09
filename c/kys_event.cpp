@@ -352,7 +352,8 @@ int instruct_16(int rnum, int jump1, int jump2)
 // ==== instruct_17 - 写场景数据 ====
 void instruct_17(int* list, int count)
 {
-    // TODO: 完整实现
+    SData[list[0]][list[1]][list[3]][list[2]] = static_cast<int16_t>(list[4]);
+    InitialScene();
 }
 
 // ==== instruct_18 - 判断是否拥有物品 ====
@@ -436,7 +437,18 @@ void instruct_24() { /* 空实现 */ }
 // ==== instruct_25 - 场景滚动动画 ====
 void instruct_25(int x1, int y1, int x2, int y2)
 {
-    // TODO: 完整滚动实现
+    int xstep = Sx, ystep = Sy;
+    int stepx = (x1 > x2) ? 1 : ((x1 < x2) ? -1 : 0);
+    int stepy = (y1 > y2) ? 1 : ((y1 < y2) ? -1 : 0);
+    while (xstep != x2 || ystep != y2)
+    {
+        if (xstep != x2) xstep += stepx;
+        if (ystep != y2) ystep += stepy;
+        DrawSceneWithoutRole(xstep, ystep);
+        DrawRoleOnScene(xstep, ystep);
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        SDL_Delay(GameSpeed * 3);
+    }
 }
 
 // ==== instruct_26 - 修改事件D数据 ====
@@ -450,7 +462,16 @@ void instruct_26(int snum, int enum_, int add1, int add2, int add3)
 // ==== instruct_27 - 事件动画 ====
 void instruct_27(int enum_, int beginpic, int endpic)
 {
-    // TODO
+    for (int pic = beginpic; pic <= endpic; pic++)
+    {
+        DData[CurScene][enum_][5] = static_cast<int16_t>(pic);
+        DData[CurScene][enum_][6] = static_cast<int16_t>(pic);
+        DData[CurScene][enum_][7] = static_cast<int16_t>(pic);
+        UpdateScene(DData[CurScene][enum_][10], DData[CurScene][enum_][9], pic - 1, pic);
+        Redraw();
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        SDL_Delay(GameSpeed * 5);
+    }
 }
 
 // ==== instruct_28 - 判断道德范围 ====
@@ -468,7 +489,19 @@ int instruct_29(int rnum, int r1, int r2, int jump1, int jump2)
 // ==== instruct_30 - 自动行走 ====
 void instruct_30(int x1, int y1, int x2, int y2)
 {
-    // TODO: 完整寻路实现
+    int ex = DData[CurScene][CurEvent][10];
+    int ey = DData[CurScene][CurEvent][9];
+    SData[CurScene][3][ex][ey] = -1;
+    findway(x2, y2);
+    for (int i = 0; i < nowstep; i++)
+    {
+        Moveman(x1, y1, linex[i], liney[i]);
+        x1 = linex[i]; y1 = liney[i];
+        Redraw();
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        SDL_Delay(GameSpeed * 3);
+    }
+    SData[CurScene][3][ex][ey] = static_cast<int16_t>(CurEvent);
 }
 
 // ==== instruct_31 - 判断金钱 ====
@@ -592,7 +625,25 @@ int instruct_43(int inum, int jump1, int jump2)
 // ==== instruct_44 - 双事件同步动画 ====
 void instruct_44(int enum1, int beginpic1, int endpic1, int enum2, int beginpic2, int endpic2)
 {
-    // TODO
+    int step = std::max(endpic1 - beginpic1, endpic2 - beginpic2);
+    for (int i = 0; i <= step; i++)
+    {
+        int pic1 = std::min(beginpic1 + i, endpic1);
+        int pic2 = std::min(beginpic2 + i, endpic2);
+        DData[CurScene][enum1][5] = static_cast<int16_t>(pic1);
+        DData[CurScene][enum1][6] = static_cast<int16_t>(pic1);
+        DData[CurScene][enum1][7] = static_cast<int16_t>(pic1);
+        DData[CurScene][enum2][5] = static_cast<int16_t>(pic2);
+        DData[CurScene][enum2][6] = static_cast<int16_t>(pic2);
+        DData[CurScene][enum2][7] = static_cast<int16_t>(pic2);
+        UpdateScene(DData[CurScene][enum1][10], DData[CurScene][enum1][9],
+            (i > 0) ? pic1 - 1 : 0, pic1);
+        UpdateScene(DData[CurScene][enum2][10], DData[CurScene][enum2][9],
+            (i > 0) ? pic2 - 1 : 0, pic2);
+        Redraw();
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        SDL_Delay(GameSpeed * 5);
+    }
 }
 
 // ==== instruct_45~49 - 增加属性 ====
@@ -660,23 +711,84 @@ int instruct_50(int* list, int count)
 {
     if (count >= 7 && list[0] <= 128)
         return instruct_50e(list[0], list[1], list[2], list[3], list[4], list[5], list[6]);
-    // 判断5物品齐全逻辑
-    // TODO
-    return 0;
+    // 判断5物品齐全逻辑 (code > 128)
+    for (int i = 0; i < 5; i++)
+    {
+        if (list[i] > 0 && instruct_18(list[i], 0, 1) == 1)
+            return list[6]; // 缺少物品
+    }
+    return list[5]; // 5物品齐全
 }
 
-void instruct_51() { /* 随机语录 TODO */ }
-void instruct_52() { /* 品德指数 TODO */ }
-void instruct_53() { /* 声望指数 TODO */ }
-void instruct_54() { /* 开放全部场景 TODO */ }
+void instruct_51()
+{
+    instruct_1(SOFTSTAR_BEGIN_TALK + rand() % SOFTSTAR_NUM_TALK, 0x72, 0);
+}
+void instruct_52()
+{
+    std::wstring str = L" 品德指數";
+    DrawTextWithRect(reinterpret_cast<uint16_t*>(str.data()), CENTER_X - 75, CENTER_Y - 50, 150,
+        ColColor(0x21), ColColor(0x23));
+    str = std::format(L" {:5d}", static_cast<int>(RRole[0].Ethics));
+    DrawEngShadowText(reinterpret_cast<uint16_t*>(str.data()), CENTER_X - 15, CENTER_Y - 25, ColColor(0x5), ColColor(0x7));
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    WaitAnyKey();
+    Redraw();
+}
+void instruct_53()
+{
+    std::wstring str = L" 聲望指數";
+    DrawTextWithRect(reinterpret_cast<uint16_t*>(str.data()), CENTER_X - 75, CENTER_Y - 50, 150,
+        ColColor(0x21), ColColor(0x23));
+    str = std::format(L" {:5d}", static_cast<int>(RRole[0].Repute));
+    DrawEngShadowText(reinterpret_cast<uint16_t*>(str.data()), CENTER_X - 15, CENTER_Y - 25, ColColor(0x5), ColColor(0x7));
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    WaitAnyKey();
+    Redraw();
+}
+void instruct_54()
+{
+    for (int i = 0; i < static_cast<int>(RScene.size()); i++)
+    {
+        if (RScene[i].EnCondition > 0)
+            RScene[i].EnCondition = 0;
+        if (RScene[i].EnCondition == -1)
+            RScene[i].EnCondition = 2;
+    }
+}
 
 int instruct_55(int enum_, int Value, int jump1, int jump2)
 {
     return (DData[CurScene][enum_][0] == Value) ? jump1 : jump2;
 }
 
-void instruct_56(int Repute) { /* 增加声望 TODO */ }
-void instruct_58() { /* 华山论剑 TODO */ }
+void instruct_56(int Repute)
+{
+    RRole[0].Repute += static_cast<int16_t>(Repute);
+    if (RRole[0].Repute > 200) RRole[0].Repute = 200;
+}
+void instruct_58()
+{
+    for (int i = 0; i < 15; i++)
+    {
+        int battlenum = 50 + rand() % 5;
+        Battle(battlenum, 0);
+        if ((i + 1) % 3 == 0)
+        {
+            // 每3场休息
+            for (int j = 0; j < 6; j++)
+            {
+                int rnum = TeamList[j];
+                if (rnum >= 0)
+                {
+                    RRole[rnum].CurrentHP = RRole[rnum].MaxHP;
+                    RRole[rnum].CurrentMP = RRole[rnum].MaxMP;
+                    RRole[rnum].PhyPower = MAX_PHYSICAL_POWER;
+                }
+            }
+        }
+    }
+}
 
 void instruct_59()
 {
@@ -695,10 +807,39 @@ int instruct_60(int snum, int enum_, int pic, int jump1, int jump2)
     return (DData[snum][enum_][5] == pic) ? jump1 : jump2;
 }
 
-void instruct_62() { /* 结局动画 TODO */ }
-void EndAmi() { /* 结局制作人名单 TODO */ }
+void instruct_62()
+{
+    Where = 3;
+    EndAmi();
+    LoadR(0);
+    gametime += 1;
+    Start();
+}
+void EndAmi()
+{
+    DrawRectangleWithoutFrame(0, 0, screen->w, screen->h, 0, 0);
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    int x = CENTER_X - Maker_Pic.pic->w / 2;
+    int total = Maker_Pic.pic->h;
+    for (int y = screen->h; y > -total; y -= 1)
+    {
+        DrawRectangleWithoutFrame(0, 0, screen->w, screen->h, 0, 0);
+        display_imgFromSurface(Maker_Pic, x, y);
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        SDL_Delay(30);
+        SDL_Event ev;
+        while (SDL_PollEvent(&ev))
+        {
+            if (ev.type == SDL_EVENT_KEY_UP || ev.type == SDL_EVENT_MOUSE_BUTTON_UP)
+            {
+                y = -total; // 跳过
+                break;
+            }
+        }
+    }
+}
 void instruct_63(int rnum, int sexual) { RRole[rnum].Sexual = static_cast<int16_t>(sexual); }
-void instruct_64() { /* 韦小宝商店 TODO */ }
+void instruct_64() { /* 空实现 — Pascal原始代码为空 */ }
 void instruct_66(int musicnum) { PlayMP3(musicnum, -1); }
 void instruct_67(int Soundnum) { PlaySoundEffect(Soundnum); }
 
@@ -886,7 +1027,13 @@ int instruct_50e(int code, int e1, int e2, int e3, int e4, int e5, int e6)
     }
     case 33: // 绘制GBK文本
     {
-        // TODO: 完整实现
+        int px = e_GetValue(0, e1, e2);
+        int py = e_GetValue(1, e1, e3);
+        int addr = e_GetValue(2, e1, e4);
+        uint32 c1 = ColColor(0, e_GetValue(3, e1, e5));
+        uint32 c2 = ColColor(0, e_GetValue(4, e1, e6));
+        const char* gbk = reinterpret_cast<const char*>(&x50[addr]);
+        DrawGBKShadowText(gbk, px, py, c1, c2);
         break;
     }
     case 34: // 绘制矩形
@@ -933,14 +1080,12 @@ int instruct_50e(int code, int e1, int e2, int e3, int e4, int e5, int e6)
             case -10: x50[0x7000] = rotoSpellPicture(e_GetValue(1, e1, e3), e_GetValue(2, e1, e4)) ? 0 : 1; break;
             case -21: x50[e3] = FemaleSnake(); break;
             default:
-                // TODO: 其他负值子指令
                 break;
             }
         }
         break;
     }
     default:
-        // TODO: 其他 code
         break;
     }
     return result;
@@ -978,14 +1123,47 @@ int GetGongtiLevel(int person, int mnum)
 // ==== SetGongti ====
 void SetGongti(int rnum, int mnum)
 {
-    // TODO: 完整实现
+    int16_t oldGongti = RRole[rnum].Gongti;
+    if (oldGongti > -1)
+    {
+        int oldlv = GetGongtiLevel(rnum, oldGongti);
+        RRole[rnum].MaxHP -= RMagic[oldGongti].AddHP[oldlv];
+        RRole[rnum].MaxMP -= RMagic[oldGongti].AddMP[oldlv];
+    }
+    RRole[rnum].Gongti = static_cast<int16_t>(mnum);
+    if (mnum > -1)
+    {
+        int newlv = GetGongtiLevel(rnum, mnum);
+        RRole[rnum].MaxHP += RMagic[mnum].AddHP[newlv];
+        RRole[rnum].MaxMP += RMagic[mnum].AddMP[newlv];
+    }
+    if (RRole[rnum].CurrentHP > RRole[rnum].MaxHP)
+        RRole[rnum].CurrentHP = RRole[rnum].MaxHP;
+    if (RRole[rnum].CurrentMP > RRole[rnum].MaxMP)
+        RRole[rnum].CurrentMP = RRole[rnum].MaxMP;
+    RRole[rnum].CurrentHP = std::max<int16_t>(RRole[rnum].CurrentHP, 0);
+    RRole[rnum].CurrentMP = std::max<int16_t>(RRole[rnum].CurrentMP, 0);
 }
 
 // ==== GetGongtiState ====
 bool GetGongtiState(int person, int state)
 {
-    // TODO: 完整实现
-    return false;
+    if (RRole[person].Gongti <= -1) return false;
+    int mnum = RRole[person].Gongti;
+    if (RMagic[mnum].BattleState != state) return false;
+    int lv = GetGongtiLevel(person, mnum);
+    if (lv < RMagic[mnum].MaxLevel) return false;
+    // 检查队伍中是否有人拥有petskill 5并在附近 (针对特定state)
+    for (int i = 0; i < 6; i++)
+    {
+        int tm = TeamList[i];
+        if (tm >= 0 && tm != person)
+        {
+            if (GetPetSkill(tm, 5) || GetPetSkill(tm, 4))
+                return true;
+        }
+    }
+    return true;
 }
 
 // ==== GetEquipState ====
@@ -1074,8 +1252,8 @@ int GetItemCount(int inum)
 // ==== GetPetSkill ====
 bool GetPetSkill(int rnum, int skill)
 {
-    // TODO: 完整实现
-    return false;
+    if (skill < 0 || skill >= 10) return false;
+    return RRole[rnum].Magic[skill] > 0;
 }
 
 // ==== ReadTalk ====
@@ -1116,26 +1294,552 @@ void JmpScene(int snum, int y, int x)
 // ==== NewTalk0 ====
 void NewTalk0(int headnum, int talknum, int namenum, int place, int showhead, int color, int frame)
 {
-    // TODO: 完整实现
+    // 简化实现：读取对话并用 instruct_1 风格显示
+    // 复杂的逐字GBK渲染用 NewTalk 实现
+    FILE* idx = PasOpen(AppPath + TALK_IDX, "rb");
+    FILE* grp = PasOpen(AppPath + TALK_GRP, "rb");
+    if (!idx || !grp) { if (idx) fclose(idx); if (grp) fclose(grp); return; }
+
+    int offset = 0, len = 0;
+    if (talknum == 0) { fread(&len, 4, 1, idx); }
+    else { fseek(idx, (talknum - 1) * 4, SEEK_SET); fread(&offset, 4, 1, idx); fread(&len, 4, 1, idx); }
+    len -= offset;
+    std::vector<uint8_t> buf(len + 2);
+    fseek(grp, offset, SEEK_SET);
+    fread(buf.data(), 1, len, grp);
+    fclose(idx); fclose(grp);
+    for (int i = 0; i < len; i++) { buf[i] ^= 0xFF; if (buf[i] == 0xFF) buf[i] = 0; }
+    buf[len] = 0;
+
+    // 读取名称
+    std::wstring NameStr;
+    if (namenum > 0)
+    {
+        FILE* nidx = PasOpen(AppPath + NAME_IDX, "rb");
+        FILE* ngrp = PasOpen(AppPath + NAME_GRP, "rb");
+        if (nidx && ngrp)
+        {
+            int noffset = 0, nlen = 0;
+            if (namenum == 0) { fread(&nlen, 4, 1, nidx); }
+            else { fseek(nidx, (namenum - 1) * 4, SEEK_SET); fread(&noffset, 4, 1, nidx); fread(&nlen, 4, 1, nidx); }
+            nlen -= noffset;
+            std::vector<uint8_t> namebuf(nlen + 2);
+            fseek(ngrp, noffset, SEEK_SET);
+            fread(namebuf.data(), 1, nlen, ngrp);
+            for (int i = 0; i < nlen; i++) namebuf[i] ^= 0xFF;
+            namebuf[nlen] = 0;
+            NameStr = GBKToUnicode(reinterpret_cast<const char*>(namebuf.data()));
+            fclose(nidx); fclose(ngrp);
+        }
+        else { if (nidx) fclose(nidx); if (ngrp) fclose(ngrp); }
+    }
+    else if (namenum == -2)
+    {
+        int HeadNumR = headnum;
+        if (headnum >= 412 && headnum <= 429) HeadNumR = 0;
+        for (int i = 0; i < static_cast<int>(RRole.size()); i++)
+        {
+            if (RRole[i].HeadNum == HeadNumR || (i == 0 && HeadNumR == 0))
+            {
+                NameStr = GBKToUnicode(reinterpret_cast<const char*>(RRole[i].Name));
+                break;
+            }
+        }
+    }
+
+    std::wstring TalkStr = GBKToUnicode(reinterpret_cast<const char*>(buf.data()));
+    // 名字替换
+    std::wstring FullNameStr = GBKToUnicode(reinterpret_cast<const char*>(RRole[0].Name));
+    TalkStr = ReplaceStr(TalkStr, L"&&", FullNameStr);
+    std::wstring SurName, GivenName;
+    DivideName(FullNameStr, SurName, GivenName);
+    TalkStr = ReplaceStr(TalkStr, L"$$", SurName);
+    TalkStr = ReplaceStr(TalkStr, L"%%", GivenName);
+
+    // 去掉控制码，简单显示
+    TalkStr = ReplaceStr(TalkStr, L"@@", L"");
+    TalkStr = ReplaceStr(TalkStr, L"##", L"");
+    TalkStr = ReplaceStr(TalkStr, L"**", L"\n");
+
+    // 计算位置
+    int Frame_X = 50;
+    int Frame_Y = CENTER_Y * 2 - 180;
+    int Talk_X = Frame_X + 50;
+    int Talk_Y = Frame_Y + 35;
+    int Head_X = 30, Head_Y = CENTER_Y * 2 - 120;
+
+    if (place > 2) place = 5 - place;
+    if (place == 1) { Head_X = CENTER_X * 2 - 100; Head_Y = CENTER_Y * 2 - 120; Talk_X = 30; }
+    else if (place == 2) { Talk_X = Frame_X + 70; }
+
+    Redraw();
+    DrawRectangleWithoutFrame(0, Frame_Y, CENTER_X * 2, 170, 0, 60);
+    if (showhead == 0 && headnum >= 0) DrawHeadPic(headnum, Head_X, Head_Y);
+    if (!NameStr.empty())
+    {
+        DrawShadowText(reinterpret_cast<uint16_t*>(NameStr.data()),
+            Talk_X, Frame_Y + 7, ColColor(5), ColColor(7));
+    }
+
+    // 逐行显示
+    int row = 0, MaxRow = 5, MaxCol = 30;
+    MaxCol = static_cast<int>((CENTER_X * 2 - (768 - MaxCol * 20)) / 20);
+    int ColSpacing = 20, RowSpacing = 25;
+    size_t pos = 0;
+    while (pos < TalkStr.size())
+    {
+        int col = 0;
+        while (pos < TalkStr.size() && TalkStr[pos] != L'\n' && col < MaxCol)
+        {
+            wchar_t ch = TalkStr[pos];
+            if (ch == L'^' && pos + 1 < TalkStr.size()) { pos += 2; continue; } // 跳过颜色码
+            std::wstring tmp(1, ch);
+            tmp += L'\0';
+            int xtemp = Talk_X + ColSpacing * col;
+            if (static_cast<uint16_t>(ch) < 0x1000) xtemp += 5;
+            DrawShadowText(reinterpret_cast<uint16_t*>(tmp.data()), xtemp, Talk_Y + RowSpacing * row,
+                ColColor(0x6F63 & 0xFF), ColColor((0x6F63 >> 8) & 0xFF));
+            col++;
+            pos++;
+        }
+        if (pos < TalkStr.size() && TalkStr[pos] == L'\n') pos++;
+        row++;
+        if (row >= MaxRow)
+        {
+            SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+            WaitAnyKey();
+            row = 0;
+            Redraw();
+            DrawRectangleWithoutFrame(0, Frame_Y, CENTER_X * 2, 170, 0, 60);
+            if (showhead == 0 && headnum >= 0) DrawHeadPic(headnum, Head_X, Head_Y);
+            if (!NameStr.empty())
+                DrawShadowText(reinterpret_cast<uint16_t*>(NameStr.data()),
+                    Talk_X, Frame_Y + 7, ColColor(5), ColColor(7));
+        }
+    }
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    WaitAnyKey();
+    Redraw();
 }
 
 // ==== NewTalk ====
 void NewTalk(int headnum, int talknum, int namenum, int place, int showhead, int color, int frame,
     const std::wstring& content, const std::wstring& disname)
 {
-    // TODO: 完整实现
+    const int RowSpacing = 25, ColSpacing = 20, MaxRow = 5, NameColSpacing = 20;
+    int MaxCol = 30;
+    MaxCol = static_cast<int>((CENTER_X * 2 - (768 - MaxCol * ColSpacing)) / ColSpacing);
+    int Frame_X = 50, Frame_Y = CENTER_Y * 2 - 180;
+    int Talk_X = Frame_X + 50, Talk_Y = Frame_Y + 35;
+    int Name_X = Talk_X, Name_Y = Frame_Y + 7;
+    int Head_X = 30, Head_Y = CENTER_Y * 2 - 120;
+    int Talk_W = MaxCol, Talk_H = MaxRow;
+
+    if (place > 2) place = 5 - place;
+    if (place == 0) { Head_X = 30; Head_Y = CENTER_Y * 2 - 120; }
+    else if (place == 1) { Head_X = CENTER_X * 2 - 100; Head_Y = CENTER_Y * 2 - 120; Talk_X = 30; Name_X = Talk_X; Name_Y = Frame_Y + 7; }
+    else if (place == 2) { Talk_X = Frame_X + 70; }
+
+    // 颜色映射
+    switch (color)
+    {
+    case 0: color = 28515; break;
+    case 1: color = 28421; break;
+    case 2: color = 28435; break;
+    case 3: color = 28563; break;
+    case 4: color = 28466; break;
+    case 5: color = 28450; break;
+    }
+    uint8_t ForeGroundCol = color & 0xFF;
+    uint8_t BackGroundCol = (color >> 8) & 0xFF;
+
+    // 获取对话内容
+    std::wstring TalkStr;
+    if (content.empty())
+    {
+        if (talknum >= 0)
+        {
+            TalkStr = ReadTalk(talknum);
+            if (!TalkStr.empty()) TalkStr = TalkStr.substr(1); // 去掉首字符
+        }
+        else
+        {
+            int idx = -talknum;
+            if (idx >= 0 && idx < 0x10000)
+            {
+                const wchar_t* wp = reinterpret_cast<const wchar_t*>(&x50[idx]);
+                TalkStr = wp;
+            }
+        }
+    }
+    else
+        TalkStr = content;
+    TalkStr = L" " + TalkStr;
+
+    // 获取名称
+    std::wstring NameStr;
+    if (disname.empty())
+    {
+        if (namenum > 0)
+        {
+            FILE* nidx = PasOpen(AppPath + NAME_IDX, "rb");
+            FILE* ngrp = PasOpen(AppPath + NAME_GRP, "rb");
+            if (nidx && ngrp)
+            {
+                int noffset = 0, nlen = 0;
+                fseek(nidx, (namenum - 1) * 4, SEEK_SET);
+                fread(&noffset, 4, 1, nidx);
+                fread(&nlen, 4, 1, nidx);
+                nlen -= noffset;
+                std::vector<uint8_t> namebuf(nlen + 2);
+                fseek(ngrp, noffset, SEEK_SET);
+                fread(namebuf.data(), 1, nlen, ngrp);
+                for (int i = 0; i < nlen; i++) namebuf[i] ^= 0xFF;
+                namebuf[nlen] = 0;
+                NameStr = GBKToUnicode(reinterpret_cast<const char*>(namebuf.data()));
+                fclose(nidx); fclose(ngrp);
+            }
+            else { if (nidx) fclose(nidx); if (ngrp) fclose(ngrp); }
+        }
+        else if (namenum == -2)
+        {
+            int HeadNumR = headnum;
+            if (headnum >= 412 && headnum <= 429) HeadNumR = 0;
+            for (int i = 0; i < static_cast<int>(RRole.size()); i++)
+            {
+                if (RRole[i].HeadNum == HeadNumR || (i == 0 && HeadNumR == 0))
+                {
+                    NameStr = GBKToUnicode(reinterpret_cast<const char*>(RRole[i].Name));
+                    break;
+                }
+            }
+        }
+        else if (namenum == 0)
+        {
+            NameStr = GBKToUnicode(reinterpret_cast<const char*>(RRole[0].Name));
+        }
+    }
+    else
+        NameStr = disname;
+
+    // 名字替换
+    std::wstring FullNameStr = GBKToUnicode(reinterpret_cast<const char*>(RRole[0].Name));
+    TalkStr = ReplaceStr(TalkStr, L"&&", FullNameStr);
+    std::wstring SurName, GivenName;
+    if (TalkStr.find(L"$$") != std::wstring::npos || TalkStr.find(L"%%") != std::wstring::npos)
+    {
+        DivideName(FullNameStr, SurName, GivenName);
+        TalkStr = ReplaceStr(TalkStr, L"$$", SurName);
+        TalkStr = ReplaceStr(TalkStr, L"%%", GivenName);
+    }
+
+    Redraw();
+
+    uint32 DrawForeGroundCol = ColColor(ForeGroundCol);
+    uint32 DrawBackGroundCol = ColColor(BackGroundCol);
+    int len = static_cast<int>(TalkStr.size());
+    int I = 0;
+    bool skipSync = false;
+
+    while (true)
+    {
+        Redraw();
+        DrawRectangleWithoutFrame(0, Frame_Y, CENTER_X * 2, 170, 0, 60);
+        if (showhead == 0 && headnum >= 0)
+            DrawHeadPic(headnum, Head_X, Head_Y);
+        if (!NameStr.empty() || showhead != 0)
+        {
+            for (int ix = 0; ix < static_cast<int>(NameStr.size()); ix++)
+            {
+                std::wstring tmp(1, NameStr[ix]);
+                tmp += L'\0';
+                DrawShadowText(reinterpret_cast<uint16_t*>(tmp.data()),
+                    Name_X + ix * NameColSpacing, Name_Y, ColColor(5), ColColor(7));
+            }
+        }
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+
+        int ix = 0, iy = 0;
+        skipSync = false;
+        SDL_Event ev;
+        while (SDL_PollEvent(&ev) || true)
+        {
+            CheckBasicEvent();
+            if (ev.type == SDL_EVENT_KEY_UP && (ev.key.key == SDLK_ESCAPE))
+            {
+                skipSync = true;
+                break;
+            }
+            if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP && ev.button.button == SDL_BUTTON_RIGHT)
+            {
+                skipSync = true;
+                break;
+            }
+            if (ev.type == SDL_EVENT_KEY_UP && (ev.key.key == SDLK_RETURN || ev.key.key == SDLK_SPACE))
+                skipSync = true;
+            if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP && ev.button.button == SDL_BUTTON_LEFT)
+                skipSync = true;
+
+            if (!(ix < Talk_W && iy < Talk_H && I < len))
+                break;
+
+            // 控制码检查: @@
+            if (I + 1 < len && TalkStr[I] == L'@' && TalkStr[I + 1] == L'@')
+            {
+                I += 2;
+                WaitAnyKey();
+                continue;
+            }
+            // ##
+            if (I + 1 < len && TalkStr[I] == L'#' && TalkStr[I + 1] == L'#')
+            {
+                I += 2;
+                SDL_Delay(500);
+                continue;
+            }
+            // **
+            if (I + 1 < len && TalkStr[I] == L'*' && TalkStr[I + 1] == L'*')
+            {
+                iy++;
+                ix = 0;
+                I += 2;
+                if (iy >= Talk_H)
+                {
+                    if (I < len) WaitAnyKey();
+                    break;
+                }
+                continue;
+            }
+            // ^0 ~ ^5 颜色变换
+            if (I + 1 < len && TalkStr[I] == L'^')
+            {
+                wchar_t nc = TalkStr[I + 1];
+                if (nc >= L'0' && nc <= L'5')
+                {
+                    DrawBackGroundCol = ColColor(0x6F);
+                    switch (nc - L'0')
+                    {
+                    case 0: DrawForeGroundCol = ColColor(0x63); break;
+                    case 1: DrawForeGroundCol = ColColor(0x05); break;
+                    case 2: DrawForeGroundCol = ColColor(0x13); break;
+                    case 3: DrawForeGroundCol = ColColor(0x93); break;
+                    case 4: DrawForeGroundCol = ColColor(0x32); break;
+                    case 5: DrawForeGroundCol = ColColor(0x22); break;
+                    }
+                    I += 2;
+                    continue;
+                }
+                // ^^ 恢复颜色
+                if (nc == L'^')
+                {
+                    DrawBackGroundCol = ColColor(BackGroundCol);
+                    DrawForeGroundCol = ColColor(ForeGroundCol);
+                    I += 2;
+                    continue;
+                }
+            }
+
+            if (I < len)
+            {
+                std::wstring tmp(1, TalkStr[I]);
+                tmp += L'\0';
+                int xtemp = Talk_X + ColSpacing * ix;
+                if (static_cast<uint16_t>(TalkStr[I]) < 0x1000) xtemp += 5;
+                DrawShadowText(reinterpret_cast<uint16_t*>(tmp.data()),
+                    xtemp, Talk_Y + RowSpacing * iy, DrawForeGroundCol, DrawBackGroundCol);
+            }
+            I++;
+            if (!skipSync)
+            {
+                SDL_Delay(5);
+                SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+            }
+            ix++;
+            if (ix >= Talk_W || iy >= Talk_H)
+            {
+                ix = 0;
+                iy++;
+                if (iy >= Talk_H)
+                {
+                    if (I <= len)
+                    {
+                        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+                        WaitAnyKey();
+                        if (skipSync) WaitAnyKey();
+                        skipSync = false;
+                    }
+                    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+                    break;
+                }
+            }
+        }
+        if (I >= len) break;
+    }
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    WaitAnyKey();
+    if (skipSync) WaitAnyKey();
+    Redraw();
 }
 
 // ==== ShowTitle ====
 void ShowTitle(int talknum, int color)
 {
-    // TODO: 完整实现
+    int color1 = color & 0xFF;
+    int color2 = (color >> 8) & 0xFF;
+    int y = (Where != 3) ? 30 : 60;
+    int w = 640, h = 109;
+    int row = (Where != 3) ? 5 : 15;
+    int cell = 25;
+
+    FILE* idx = PasOpen(AppPath + TALK_IDX, "rb");
+    FILE* grp = PasOpen(AppPath + TALK_GRP, "rb");
+    if (!idx || !grp) { if (idx) fclose(idx); if (grp) fclose(grp); return; }
+
+    int offset = 0, len = 0;
+    if (talknum == 0) { fread(&len, 4, 1, idx); }
+    else { fseek(idx, (talknum - 1) * 4, SEEK_SET); fread(&offset, 4, 1, idx); fread(&len, 4, 1, idx); }
+    len -= offset;
+    std::vector<uint8_t> talkarray(len + 2);
+    fseek(grp, offset, SEEK_SET);
+    fread(talkarray.data(), 1, len, grp);
+    fclose(idx); fclose(grp);
+    for (int i = 0; i < len; i++)
+    {
+        talkarray[i] ^= 0xFF;
+        if (talkarray[i] == 0xFF) talkarray[i] = 0;
+    }
+    talkarray[len] = 0;
+
+    // 名字数据
+    const char* ap = reinterpret_cast<const char*>(RRole[0].Name);
+    int alen = static_cast<int>(strlen(ap));
+
+    const uint8_t* tp = talkarray.data();
+    int tplen = static_cast<int>(strlen(reinterpret_cast<const char*>(tp)));
+    int x1 = (tplen > cell * 2) ? 300 - cell * 10 : 300 - tplen * 5;
+    int y1 = ((tplen / 2) > cell * row) ? y + h / 2 - 50 : y + h / 2 - 10 - ((tplen / 2) / cell) * 10;
+
+    int ch = 0;
+    uint16_t pword[2] = { 0, 0 };
+    while (true)
+    {
+        pword[0] = *reinterpret_cast<const uint16_t*>(tp + ch);
+        if ((pword[0] >> 8) == 0 || (pword[0] & 0xFF) == 0) break;
+
+        if (Where != 3) Redraw();
+        else DrawRectangleWithoutFrame(0, 0, screen->w, screen->h, 0, 0);
+
+        int c1 = 0, r1 = 0;
+        DrawRectangleWithoutFrame(0, y, w, h, 0, 40);
+
+        while (r1 < row)
+        {
+            pword[0] = *reinterpret_cast<const uint16_t*>(tp + ch);
+            if ((pword[0] >> 8) == 0 || (pword[0] & 0xFF) == 0) break;
+            ch += 2;
+
+            if ((pword[0] & 0xFF) == 0x5E) // ^X 颜色码
+            {
+                int cv = ((pword[0] >> 8) & 0xFF) - 0x30;
+                int newcolor;
+                switch (cv)
+                {
+                case 0: newcolor = 28515; break;
+                case 1: newcolor = 28421; break;
+                case 2: newcolor = 28435; break;
+                case 3: newcolor = 28563; break;
+                case 4: newcolor = 28466; break;
+                case 5: newcolor = 28450; break;
+                case 64: newcolor = color; break;
+                default: newcolor = color; break;
+                }
+                color1 = newcolor & 0xFF;
+                color2 = (newcolor >> 8) & 0xFF;
+            }
+            else if (pword[0] == 0x2323) // ##
+            {
+                SDL_Delay(500 * GameSpeed / 10);
+            }
+            else if (pword[0] == 0x2A2A) // **
+            {
+                if (c1 > 0) { r1++; DrawRectangleWithoutFrame(0, y + h + 11 * (r1 - 1) + 1, w, 10, 0, 40); }
+                c1 = 0;
+            }
+            else if (pword[0] == 0x4040) // @@
+            {
+                SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+                WaitAnyKey();
+            }
+            else if (pword[0] == 0x2626 || pword[0] == 0x2525 || pword[0] == 0x2424) // && $$ %%
+            {
+                const char* np3 = ap; // 默认全名
+                // 简化：仅用全名替代
+                int ni = 0;
+                while (true)
+                {
+                    uint16_t nw = *reinterpret_cast<const uint16_t*>(np3 + ni);
+                    if ((nw >> 8) == 0 || (nw & 0xFF) == 0) break;
+                    pword[0] = nw;
+                    ni += 2;
+                    DrawGBKShadowText(reinterpret_cast<const char*>(pword),
+                        x1 + CHINESE_FONT_SIZE * c1, y1 + CHINESE_FONT_SIZE * r1,
+                        ColColor(0, color1), ColColor(0, color2));
+                    c1++;
+                    if (c1 == cell) { c1 = 0; r1++; }
+                }
+            }
+            else
+            {
+                DrawGBKShadowText(reinterpret_cast<const char*>(pword),
+                    x1 + CHINESE_FONT_SIZE * c1, y1 + CHINESE_FONT_SIZE * r1,
+                    ColColor(0, color1), ColColor(0, color2));
+                c1++;
+                if (c1 == cell) { c1 = 0; r1++; }
+            }
+        }
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        WaitAnyKey();
+        if ((pword[0] & 0xFF) == 0 || (pword[0] >> 8) == 0) break;
+    }
+    if (Where != 3) Redraw();
+    else DrawRectangleWithoutFrame(0, 0, screen->w, screen->h, 0, 0);
 }
 
 // ==== ReSetName ====
 int ReSetName(int t, int inum, int newnamenum)
 {
-    // TODO: 完整实现
+    FILE* idx = PasOpen(AppPath + NAME_IDX, "rb");
+    FILE* grp = PasOpen(AppPath + NAME_GRP, "rb");
+    if (!idx || !grp) { if (idx) fclose(idx); if (grp) fclose(grp); return 0; }
+
+    int offset = 0, len = 0;
+    if (newnamenum == 0) { fread(&len, 4, 1, idx); }
+    else { fseek(idx, (newnamenum - 1) * 4, SEEK_SET); fread(&offset, 4, 1, idx); fread(&len, 4, 1, idx); }
+    len -= offset;
+    std::vector<uint8_t> talkarray(len + 2);
+    fseek(grp, offset, SEEK_SET);
+    fread(talkarray.data(), 1, len, grp);
+    fclose(idx); fclose(grp);
+    for (int i = 0; i < len; i++)
+    {
+        talkarray[i] ^= 0xFF;
+        if (talkarray[i] == 0x2A) talkarray[i] = 0;
+        if (talkarray[i] == 0xFF) talkarray[i] = 0;
+    }
+    talkarray[len] = 0;
+
+    char* p = nullptr;
+    switch (t)
+    {
+    case 0: p = reinterpret_cast<char*>(RRole[inum].Name); break;
+    case 1: p = reinterpret_cast<char*>(RItem[inum].Name); break;
+    case 2: p = reinterpret_cast<char*>(RScene[inum].Name); break;
+    case 3: p = reinterpret_cast<char*>(RMagic[inum].Name); break;
+    case 4: p = reinterpret_cast<char*>(RItem[inum].Introduction); break;
+    default: return 0;
+    }
+    for (int i = 0; i <= len; i++)
+        p[i] = static_cast<char>(talkarray[i]);
     return 0;
 }
 
@@ -1161,51 +1865,1019 @@ std::wstring ReplaceStr(const std::wstring& S, const std::wstring& Srch, const s
 }
 
 // ==== Puzzle ====
-void Puzzle() { /* TODO */ }
+void Puzzle()
+{
+    int Y1 = Sy, X1 = Sx;
+    if (SFace == 0) { Y1 = Sy; X1 = Sx - 1; }
+    else if (SFace == 1) { Y1 = Sy + 1; X1 = Sx; }
+    else if (SFace == 2) { Y1 = Sy - 1; X1 = Sx; }
+    else if (SFace == 3) { Y1 = Sy; X1 = Sx + 1; }
+
+    int CurDNum = SData[CurScene][3][X1][Y1];
+    int CenterXY = DData[CurScene][CurEvent][8];
+    int CenterY = CenterXY / 100;
+    int CenterX = CenterXY % 100;
+    if (CenterY == Sy || CenterX == Sx) return;
+
+    int X221 = Y1 - CenterY;
+    int X222 = X1 - CenterX;
+    int X223 = Y1 - Sy;
+    int X224 = X1 - Sx;
+    int X245 = X221 * X224 - X222 * X223;
+
+    int Array1000[9], Array1050[4];
+    for (int i = 0; i < 9; i++) Array1000[i] = -1;
+    for (int i = 0; i < 4; i++) Array1050[i] = -1;
+
+    for (int x246 = 0; x246 < 4; x246++)
+    {
+        int dx = 0, dy = 0;
+        if (x246 == 0) { X221 = 0; X222 = -1; }
+        if (x246 == 1) { X221 = 1; X222 = 0; }
+        if (x246 == 2) { X221 = 0; X222 = 1; }
+        if (x246 == 3) { X221 = -1; X222 = 0; }
+        int X207 = CenterY + X221;
+        int X208 = CenterX + X222;
+        int X258 = SData[CurScene][3][X208][X207];
+        if (X258 != -1)
+        {
+            int X267 = DData[CurScene][X258][8];
+            if (X267 == CenterXY)
+            {
+                Array1050[x246] = X258;
+                int X262 = (X221 - 1) * X222 * X245;
+                int X263 = (X222 + 1) * X221 * X245;
+                int X209 = X207 + X262;
+                int X210 = X208 + X263;
+                if (SData[CurScene][3][X210][X209] != -1) break;
+                int X211 = CenterY + X262;
+                int X212 = CenterX + X263;
+                if (SData[CurScene][3][X212][X211] != -1) break;
+                int X248 = X262 + 1;
+                int X249 = X263 + 1;
+                int X250 = X249 * 3 + X248;
+                Array1000[X250] = X258;
+            }
+        }
+    }
+
+    for (int x246 = 0; x246 < 4; x246++)
+    {
+        int X262 = Array1050[x246];
+        if (X262 != -1)
+        {
+            SData[CurScene][3][X1][Y1] = -1;
+            int a = DData[CurScene][CurDNum][5];
+            DData[CurScene][CurDNum][1] = static_cast<int16_t>(X262);
+            for (int j = 2; j <= 8; j++) DData[CurScene][CurDNum][j] = (j == 8) ? -1 : 0;
+            DData[CurScene][CurDNum][9] = -1;
+            DData[CurScene][CurDNum][10] = -1;
+            UpdateScene(X1, Y1, a, 0);
+        }
+    }
+
+    for (int x246 = 0; x246 < 9; x246++)
+    {
+        int X251 = Array1000[x246];
+        if (X251 != -1)
+        {
+            int X266 = x246 + 3635;
+            int X248 = x246 % 3;
+            int X249 = x246 / 3;
+            int X253 = X248 - 1;
+            int X254 = X249 - 1;
+            int X255 = CenterY + X253;
+            int X256 = CenterX + X254;
+            SData[CurScene][3][X256][X255] = static_cast<int16_t>(X251);
+            DData[CurScene][X251][0] = 1;
+            DData[CurScene][X251][2] = 540;
+            DData[CurScene][X251][5] = static_cast<int16_t>(X266);
+            DData[CurScene][X251][6] = static_cast<int16_t>(X266);
+            DData[CurScene][X251][7] = static_cast<int16_t>(X266);
+            DData[CurScene][X251][8] = static_cast<int16_t>(CenterXY);
+            DData[CurScene][X251][9] = static_cast<int16_t>(X255);
+            DData[CurScene][X251][10] = static_cast<int16_t>(X256);
+            UpdateScene(X1, Y1, 0, X266);
+        }
+    }
+
+    int X259 = SData[CurScene][3][X1][Y1];
+    if (X259 != -1)
+    {
+        Sy = Y1 + X223;
+        Sx = X1 + X224;
+    }
+    else
+    {
+        Sy = Y1;
+        Sx = X1;
+    }
+}
 
 // ==== SelectList ====
 int SelectList(int begintalknum, int amount)
 {
-    // TODO
-    return 0;
+    int w = 0;
+    MenuString.resize(amount);
+    MenuEngString.resize(amount);
+    FILE* idx = PasOpen(AppPath + TALK_IDX, "rb");
+    FILE* grp = PasOpen(AppPath + TALK_GRP, "rb");
+    if (!idx || !grp) { if (idx) fclose(idx); if (grp) fclose(grp); return 0; }
+
+    for (int talknum = begintalknum; talknum < begintalknum + amount; talknum++)
+    {
+        int offset = 0, len = 0;
+        if (talknum == 0) { fseek(idx, 0, SEEK_SET); fread(&len, 4, 1, idx); }
+        else { fseek(idx, (talknum - 1) * 4, SEEK_SET); fread(&offset, 4, 1, idx); fread(&len, 4, 1, idx); }
+        len -= offset;
+        std::vector<uint8_t> buf(len + 2);
+        fseek(grp, offset, SEEK_SET);
+        fread(buf.data(), 1, len, grp);
+        for (int i = 0; i < len; i++) { buf[i] ^= 0xFF; if (buf[i] == 0xFF) buf[i] = 0; }
+        buf[len] = 0;
+        MenuString[talknum - begintalknum] = GBKToUnicode(reinterpret_cast<const char*>(buf.data()));
+        MenuEngString[talknum - begintalknum] = L" ";
+        if (len - 1 > w) w = len - 1;
+    }
+    int x = screen->w / 2 - w * 5 - 5;
+    int y = 270 - amount * 22;
+    int result = CommonMenu(x, y, w * 10 + 10, amount - 1);
+    fclose(idx); fclose(grp);
+    return result;
 }
 
 // ==== SetScene ====
-void SetScene() { /* TODO */ }
-void chengesnowhill() { /* TODO */ }
-
-// ==== 属性获取函数（同构模式） ====
-static int GetRoleStat(int rnum, bool Equip, int TRole::*field)
+void SetScene()
 {
-    int val = RRole[rnum].*field;
-    // TODO: 功体加成, 装备加成
-    return val;
+    Effect = 0; // Note: Pascal reads from Kys_ini, C++ simplified
+    fog = false;
+    rain = -1;
+    Water = -1;
+    snow = -1;
+    showblackscreen = false;
+    if (RScene[CurScene].Mapmode == 1)
+    {
+        for (int i1 = 0; i1 < 440; i1++)
+            for (int i = 0; i < 640; i++)
+            {
+                int b = ((i - (screen->w >> 1)) * (i - (screen->w >> 1)) +
+                    (i1 - (screen->h >> 1)) * (i1 - (screen->h >> 1))) / 150;
+                if (b > 100) b = 100;
+                snowalpha[i1][i] = static_cast<uint8_t>(b);
+            }
+        showblackscreen = true;
+    }
+    else if (Effect == 0)
+    {
+        if (RScene[CurScene].Mapmode == 2)
+        {
+            for (int i1 = 0; i1 <= 60; i1++)
+            {
+                int a = ((i1 / 15) % 2 == 0) ? 1 : -1;
+                int b2 = std::abs((i1 % 15) / 5 - 2);
+                int b = a * (b2 - 1);
+                snowalpha[0][i1] = static_cast<uint8_t>(b);
+            }
+            Water = 0;
+        }
+        else if (RScene[CurScene].Mapmode == 3)
+        {
+            for (int i1 = 0; i1 < 440; i1++)
+                for (int i = 0; i < 640; i++)
+                {
+                    int r = rand() % 170;
+                    if (r == 0)
+                    {
+                        snowalpha[i1][i] = 1;
+                        r = rand() % 10;
+                        if (r == 0)
+                        {
+                            snowalpha[std::abs(i1 - 1)][i] = 1;
+                            snowalpha[i1][std::abs(i - 1)] = 1;
+                        }
+                    }
+                    else
+                        snowalpha[i1][i] = 0;
+                }
+            snow = 0;
+        }
+        else if (RScene[CurScene].Mapmode == 4)
+        {
+            for (int i1 = 0; i1 < 440; i1++)
+                for (int i = 0; i < 640; i++)
+                    snowalpha[i1][i] = 0;
+            for (int i1 = 0; i1 < 440; i1++)
+                for (int i = 0; i < 640; i++)
+                {
+                    int r = rand() % 200;
+                    if (r == 0)
+                    {
+                        snowalpha[i1][i] = 1;
+                        r = rand() % 10;
+                        for (int i2 = 0; i2 <= r; i2++)
+                        {
+                            int a = (i1 + i2);
+                            if (a > 439) a -= 440;
+                            snowalpha[a][i] = 1;
+                        }
+                    }
+                }
+            rain = 0;
+        }
+        else if (RScene[CurScene].Mapmode == 5)
+        {
+            for (int i1 = 0; i1 < 440; i1++)
+                for (int i = 0; i < 640; i++)
+                    snowalpha[i1][i] = static_cast<uint8_t>(60 + rand() % 10);
+            fog = true;
+        }
+    }
+}
+void chengesnowhill()
+{
+    SData[CurScene][0][52][33] = 1220; SData[CurScene][4][52][33] = 32;
+    SData[CurScene][0][52][32] = 1222; SData[CurScene][4][52][32] = 24;
+    SData[CurScene][0][52][31] = 1224; SData[CurScene][4][52][31] = 16;
+    SData[CurScene][0][52][30] = 1226; SData[CurScene][4][52][30] = 8;
+    SData[CurScene][0][17][45] = 1220; SData[CurScene][4][17][45] = 32;
+    SData[CurScene][0][16][45] = 1222; SData[CurScene][4][16][45] = 24;
+    SData[CurScene][0][15][45] = 1224; SData[CurScene][4][15][45] = 16;
+    SData[CurScene][0][14][45] = 1226; SData[CurScene][4][14][45] = 8;
+    for (int i = 18; i <= 52; i++) { SData[CurScene][0][i][45] = 1216; SData[CurScene][4][i][45] = 36; }
+    for (int i = 34; i <= 44; i++) { SData[CurScene][0][52][i] = 1216; SData[CurScene][4][52][i] = 36; }
+    InitialScene();
+    instruct_19(29, 52);
 }
 
-int GetRoleMedcine(int rnum, bool Equip) { return RRole[rnum].Medcine; /* TODO: full */ }
-int GetRoleMedPoi(int rnum, bool Equip) { return RRole[rnum].MedPoi; }
-int GetRoleUsePoi(int rnum, bool Equip) { return RRole[rnum].UsePoi; }
-int GetRoleAttPoi(int rnum, bool Equip) { return RRole[rnum].Defence; /* TODO */ }
-int GetRoleDefPoi(int rnum, bool Equip) { return RRole[rnum].Defence; }
-int GetRoleFist(int rnum, bool Equip) { return RRole[rnum].Fist; }
-int GetRoleSword(int rnum, bool Equip) { return RRole[rnum].Sword; }
-int GetRoleKnife(int rnum, bool Equip) { return RRole[rnum].Knife; }
-int GetRoleUnusual(int rnum, bool Equip) { return RRole[rnum].Unusual; }
-int GetRoleHidWeapon(int rnum, bool Equip) { return RRole[rnum].HidWeapon; }
-int GetRoleAttack(int rnum, bool Equip) { return RRole[rnum].Attack; }
-int GetRoleDefence(int rnum, bool Equip) { return RRole[rnum].Defence; }
-int GetRoleSpeed(int rnum, bool Equip) { return RRole[rnum].Speed; }
+// ==== 属性获取函数（同构模式） ====
+int GetRoleMedcine(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Medcine;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddMedcine;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddMedcine;
+    return result;
+}
 
-int CheckEquipSet(int e0, int e1, int e2, int e3) { return -1; /* TODO */ }
+int GetRoleMedPoi(int rnum, bool Equip)
+{
+    int result = RRole[rnum].MedPoi;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddMedPoi;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddMedPoi;
+    return result;
+}
+
+int GetRoleUsePoi(int rnum, bool Equip)
+{
+    int result = RRole[rnum].UsePoi;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddUsePoi;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddUsePoi;
+    return result;
+}
+
+int GetRoleDefPoi(int rnum, bool Equip)
+{
+    int result = RRole[rnum].DefPoi;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddDefPoi;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddDefPoi;
+    return result;
+}
+
+int GetRoleFist(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Fist;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddFist;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddFist;
+    return result;
+}
+
+int GetRoleSword(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Sword;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddSword;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddSword;
+    return result;
+}
+
+int GetRoleKnife(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Knife;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddKnife;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddKnife;
+    return result;
+}
+
+int GetRoleUnusual(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Unusual;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddUnusual;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddUnusual;
+    return result;
+}
+
+int GetRoleHidWeapon(int rnum, bool Equip)
+{
+    int result = RRole[rnum].HidWeapon;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        if (lv == RMagic[RRole[rnum].Gongti].MaxLevel)
+            result += RMagic[RRole[rnum].Gongti].AddHidWeapon;
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddHidWeapon;
+    return result;
+}
+
+int GetRoleAttack(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Attack;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        result += RMagic[RRole[rnum].Gongti].AddAtt[lv];
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddAttack;
+    return result;
+}
+
+int GetRoleDefence(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Defence;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        result += RMagic[RRole[rnum].Gongti].AddDef[lv];
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddDefence;
+    return result;
+}
+
+int GetRoleSpeed(int rnum, bool Equip)
+{
+    int result = RRole[rnum].Speed;
+    if (RRole[rnum].Gongti > -1)
+    {
+        int lv = GetGongtiLevel(rnum, RRole[rnum].Gongti);
+        result += RMagic[RRole[rnum].Gongti].AddSpd[lv];
+    }
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddSpeed;
+    return result;
+}
+
+int GetRoleAttPoi(int rnum, bool Equip)
+{
+    int result = RRole[rnum].AttPoi;
+    if (Equip)
+        for (int l = 0; l < 4; l++)
+            if (RRole[rnum].Equip[l] >= 0)
+                result += RItem[RRole[rnum].Equip[l]].AddAttPoi;
+    return result;
+}
+
+int CheckEquipSet(int e0, int e1, int e2, int e3)
+{
+    int result = -1;
+    for (int i = 0; i < 5; i++)
+    {
+        if (SetNum[i][0] != e0 && SetNum[i][0] >= 0) continue;
+        if (SetNum[i][1] != e1 && SetNum[i][1] >= 0) continue;
+        if (SetNum[i][2] != e2 && SetNum[i][2] >= 0) continue;
+        if (SetNum[i][3] != e3 && SetNum[i][3] >= 0) continue;
+        result = i;
+    }
+    return result;
+}
 
 // ==== 功体系统 ====
-void StudyGongti() { /* TODO */ }
-void ShowStudyGongti(int menu, int menu2, int max) { /* TODO */ }
-int  StadyGongtiMenu(int x, int y, int w) { return -1; /* TODO */ }
-void GongtiLevelUp(int rnum, int mnum) { /* TODO */ }
-void AddSkillPoint(int num) { /* TODO */ }
-bool AddBattleStateToEquip() { return false; /* TODO */ }
+void StudyGongti()
+{
+    int x = 10, y = 10;
+    int x1 = x + 110, y1 = y;
+    int x2 = x1, y2 = y + 210;
+    int w = 100, w1 = 510, w2 = 100;
+    int h1 = 200, h2 = 210;
+    int max1 = 0, max2 = 0;
+    int teammenu = 0, magicmenu = -1, position = 0;
+    std::vector<int> magic;
+
+    for (int i = 0; i < static_cast<int>(sizeof(TeamList) / sizeof(TeamList[0])); i++)
+    {
+        if (TeamList[i] < 0) break;
+        max1++;
+        RRole[TeamList[i]].Moveable = 0;
+    }
+    int h = max1 * 22 + 10;
+
+    // 初始化功体列表
+    max2 = 0;
+    magic.clear();
+    for (int i = 0; i < 10; i++)
+    {
+        if (RRole[TeamList[teammenu]].Magic[i] > 0 && RMagic[RRole[TeamList[teammenu]].Magic[i]].MagicType == 5)
+        {
+            magic.push_back(i);
+            max2++;
+        }
+    }
+
+    Redraw();
+    ShowStudyGongti(teammenu, magicmenu, max1);
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+
+    SDL_Event ev;
+    ev.key.key = 0;
+    while (SDL_WaitEvent(&ev))
+    {
+        CheckBasicEvent();
+        if (ev.type == SDL_EVENT_KEY_UP)
+        {
+            if (ev.key.key == SDLK_UP)
+            {
+                if (position == 0) { teammenu--; if (teammenu < 0) teammenu = max1 - 1; }
+                else { magicmenu--; if (magicmenu < 0) magicmenu = max2 - 1; }
+            }
+            if (ev.key.key == SDLK_DOWN)
+            {
+                if (position == 0) { teammenu++; if (teammenu >= max1) teammenu = 0; }
+                else { magicmenu++; if (magicmenu >= max2) magicmenu = 0; }
+            }
+            if (ev.key.key == SDLK_ESCAPE)
+            {
+                if (position == 0) break;
+                else { magicmenu = -1; position = 0; }
+            }
+            if (ev.key.key == SDLK_SPACE || ev.key.key == SDLK_RETURN)
+            {
+                if (position == 0)
+                {
+                    max2 = 0; magic.clear();
+                    for (int i = 0; i < 10; i++)
+                        if (RRole[TeamList[teammenu]].Magic[i] > 0 && RMagic[RRole[TeamList[teammenu]].Magic[i]].MagicType == 5)
+                        { magic.push_back(i); max2++; }
+                    if (max2 > 0) { position = 1; magicmenu = 0; }
+                    else magicmenu = -1;
+                }
+                else
+                {
+                    int rnum = TeamList[teammenu];
+                    int mnum = RRole[rnum].Magic[magic[magicmenu]];
+                    int lv = GetGongtiLevel(rnum, mnum);
+                    if (RMagic[mnum].MaxLevel > lv && RRole[rnum].GongtiExam >= static_cast<uint16_t>(RMagic[mnum].NeedExp[lv + 1]))
+                    {
+                        MenuString.resize(2);
+                        MenuString[0] = L" 學習";
+                        MenuString[1] = L" 取消";
+                        if (StadyGongtiMenu(x2 + 300, y2 + 6, 98) == 0)
+                        {
+                            GongtiLevelUp(rnum, mnum);
+                            RRole[rnum].GongtiExam -= RMagic[mnum].NeedExp[lv + 1];
+                            RRole[rnum].MagLevel[magic[magicmenu]] += 100;
+                            RRole[rnum].Moveable = 0;
+                        }
+                        MenuString.clear();
+                    }
+                }
+            }
+            Redraw();
+            ShowStudyGongti(teammenu, magicmenu, max1);
+            SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        }
+        if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP)
+        {
+            if (ev.button.button == SDL_BUTTON_RIGHT)
+            {
+                if (position == 0) break;
+                else { magicmenu = -1; position = 0; }
+            }
+            if (ev.button.button == SDL_BUTTON_LEFT)
+            {
+                if (position == 0)
+                {
+                    max2 = 0; magic.clear();
+                    for (int i = 0; i < 10; i++)
+                        if (RRole[TeamList[teammenu]].Magic[i] > 0 && RMagic[RRole[TeamList[teammenu]].Magic[i]].MagicType == 5)
+                        { magic.push_back(i); max2++; }
+                    if (max2 > 0) { position = 1; magicmenu = 0; }
+                    else magicmenu = -1;
+                }
+                else
+                {
+                    int rnum = TeamList[teammenu];
+                    int mnum = RRole[rnum].Magic[magic[magicmenu]];
+                    int lv = GetGongtiLevel(rnum, mnum);
+                    if (RMagic[mnum].MaxLevel > lv && RRole[rnum].GongtiExam >= static_cast<uint16_t>(RMagic[mnum].NeedExp[lv + 1]))
+                    {
+                        MenuString.resize(2);
+                        MenuString[0] = L" 學習";
+                        MenuString[1] = L" 取消";
+                        if (StadyGongtiMenu(x2 + 300, y2 + 6, 98) == 0)
+                        {
+                            GongtiLevelUp(rnum, mnum);
+                            RRole[rnum].GongtiExam -= RMagic[mnum].NeedExp[lv + 1];
+                            RRole[rnum].MagLevel[magic[magicmenu]] += 100;
+                            RRole[rnum].Moveable = 0;
+                        }
+                        MenuString.clear();
+                    }
+                }
+            }
+            Redraw();
+            ShowStudyGongti(teammenu, magicmenu, max1);
+            SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        }
+    }
+}
+void ShowStudyGongti(int menu, int menu2, int max)
+{
+    int x = 10, y = 10;
+    int x1 = x + 110, y1 = y;
+    int x2 = x1, y2 = y + 210;
+    int w = 100, w1 = 510, w2 = 110;
+    int h1 = 200, h2 = 210;
+    int h = max * 22 + 10;
+    int x3 = x2 + 120, y3 = y2, w3 = w1 - 120, h3 = h2;
+
+    DrawRectangle(x, y, w, h, 0, 0xFFFFFF, 60);
+    DrawRectangle(x1, y1, w1, h1, 0, 0xFFFFFF, 60);
+
+    for (int i = 0; i < max; i++)
+    {
+        std::wstring name = GBKToUnicode(reinterpret_cast<const char*>(RRole[TeamList[i]].Name));
+        if (menu != i)
+            DrawShadowText(reinterpret_cast<uint16_t*>(name.data()), x - 10, y + 5 + 22 * i, ColColor(0, 5), ColColor(0, 7));
+        else
+            DrawShadowText(reinterpret_cast<uint16_t*>(name.data()), x - 10, y + 5 + 22 * i, ColColor(0, 0x64), ColColor(0, 0x66));
+    }
+
+    int rnum = TeamList[menu];
+    if (rnum < 0) return;
+
+    DrawHeadPic(RRole[rnum].HeadNum, x1 + 23, y1 + 70);
+    std::wstring pname = GBKToUnicode(reinterpret_cast<const char*>(RRole[rnum].Name));
+    int l = static_cast<int>(pname.size()) - 1;
+    DrawShadowText(reinterpret_cast<uint16_t*>(pname.data()), x1 + 30 - l * 10, y1 + 78, ColColor(0, 0x5), ColColor(0, 0x7));
+
+    auto drawStatStr = [&](const wchar_t* label, int val, int px, int py) {
+        std::wstring s = std::format(L"{}", val);
+        DrawShadowText(reinterpret_cast<uint16_t*>(s.data()), px + 70, py, ColColor(0, 0x5), ColColor(0, 0x7));
+        std::wstring ls(label);
+        DrawShadowText(reinterpret_cast<uint16_t*>(ls.data()), px, py, ColColor(0, 0x5), ColColor(0, 0x7));
+    };
+
+    std::wstring str = std::format(L"{}", static_cast<int>(RRole[rnum].Level));
+    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x1 + 70, y1 + 103, ColColor(0, 0x5), ColColor(0, 0x7));
+    str = L" 等級";
+    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x1, y1 + 103, ColColor(0, 0x5), ColColor(0, 0x7));
+
+    UpdateHpMp(rnum, x1, y1 + 107);
+
+    drawStatStr(L" 攻擊", GetRoleAttack(rnum, false), x1 + 90, y1 + 10);
+    drawStatStr(L" 防禦", GetRoleDefence(rnum, false), x1 + 90, y1 + 32);
+    drawStatStr(L" 輕功", GetRoleSpeed(rnum, false), x1 + 90, y1 + 54);
+    drawStatStr(L" 醫療", GetRoleMedcine(rnum, false), x1 + 200, y1 + 10);
+    drawStatStr(L" 用毒", GetRoleUsePoi(rnum, false), x1 + 200, y1 + 32);
+    drawStatStr(L" 解毒", GetRoleMedPoi(rnum, false), x1 + 200, y1 + 54);
+    drawStatStr(L" 抗毒", GetRoleDefPoi(rnum, false), x1 + 200, y1 + 76);
+    drawStatStr(L" 拳掌", GetRoleFist(rnum, false), x1 + 310, y1 + 10);
+    drawStatStr(L" 禦劍", GetRoleSword(rnum, false), x1 + 310, y1 + 32);
+    drawStatStr(L" 耍刀", GetRoleKnife(rnum, false), x1 + 310, y1 + 54);
+    drawStatStr(L" 奇門", GetRoleUnusual(rnum, false), x1 + 310, y1 + 76);
+    drawStatStr(L" 暗器", GetRoleHidWeapon(rnum, false), x1 + 310, y1 + 98);
+
+    int max2 = 0;
+    DrawRectangle(x2, y2, w2, h2, 0, 0xFFFFFF, 60);
+    DrawRectangle(x3, y3, w3, h3, 0, 0xFFFFFF, 60);
+
+    for (int i = 0; i < 10; i++)
+    {
+        if (RRole[rnum].Magic[i] > 0 && RMagic[RRole[rnum].Magic[i]].MagicType == 5)
+        {
+            std::wstring mname = GBKToUnicode(reinterpret_cast<const char*>(RMagic[RRole[rnum].Magic[i]].Name));
+            if (menu2 != max2)
+            {
+                DrawShadowText(reinterpret_cast<uint16_t*>(mname.data()), x2 - 15, y2 + 5 + 22 * max2, ColColor(0, 5), ColColor(0, 7));
+            }
+            else
+            {
+                int mnum = RRole[rnum].Magic[i];
+                int lv = GetGongtiLevel(rnum, mnum);
+                int i1 = 0;
+                DrawShadowText(reinterpret_cast<uint16_t*>(mname.data()), x2 - 15, y2 + 5 + 22 * max2, ColColor(0, 0x64), ColColor(0, 0x66));
+                DrawShadowText(reinterpret_cast<uint16_t*>(mname.data()), x3 - 10, y3 + 5, ColColor(0, 0x5), ColColor(0, 0x7));
+
+                const wchar_t* lvStr[] = { L" 目前等級   熟練", L" 目前等級   精純", L" 目前等級   化境" };
+                str = lvStr[std::min(lv, 2)];
+                DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10, y3 + 27, ColColor(0, 0x64), ColColor(0, 0x66));
+
+                if (lv >= RMagic[mnum].MaxLevel)
+                {
+                    str = L" 已到達頂級";
+                    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10, y3 + 49, ColColor(0, 0x21), ColColor(0, 0x23));
+                }
+                else
+                {
+                    str = L" 所需經驗值 ";
+                    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10, y3 + 49, ColColor(0, 0x21), ColColor(0, 0x23));
+                    str = std::format(L" {}", static_cast<int>(RMagic[mnum].NeedExp[lv + 1]));
+                    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 + 103, y3 + 49, ColColor(0, 0x64), ColColor(0, 0x66));
+                }
+
+                str = L" 現有經驗值 ";
+                DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10, y3 + 71, ColColor(0, 0x21), ColColor(0, 0x23));
+                str = std::format(L" {}", static_cast<int>(RRole[rnum].GongtiExam));
+                DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 + 103, y3 + 71, ColColor(0, 0x64), ColColor(0, 0x66));
+
+                // 显示加成信息
+                auto showBonus = [&](int val, const wchar_t* label) {
+                    if (val != 0)
+                    {
+                        str = std::format(L"{}", val);
+                        DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10 + (i1 % 4) * 90 + 50, y3 - 5 + 98 + (i1 / 4) * 22, ColColor(0, 0x5), ColColor(0, 0x7));
+                        str = label;
+                        DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10 + (i1 % 4) * 90, y3 - 5 + 98 + (i1 / 4) * 22, ColColor(0, 0x5), ColColor(0, 0x7));
+                        i1++;
+                    }
+                };
+                showBonus(RMagic[mnum].AddHP[lv], L" 生命");
+                showBonus(RMagic[mnum].AddMP[lv], L" 內力");
+                showBonus(RMagic[mnum].AddAtt[lv], L" 攻擊");
+                showBonus(RMagic[mnum].AddDef[lv], L" 防禦");
+                showBonus(RMagic[mnum].AddSpd[lv], L" 輕功");
+                if (lv == RMagic[mnum].MaxLevel)
+                {
+                    showBonus(RMagic[mnum].AddMedcine, L" 醫療");
+                    showBonus(RMagic[mnum].AddUsePoi, L" 用毒");
+                    showBonus(RMagic[mnum].AddMedPoi, L" 解毒");
+                    showBonus(RMagic[mnum].AddDefPoi, L" 抗毒");
+                    showBonus(RMagic[mnum].AddFist, L" 拳掌");
+                    showBonus(RMagic[mnum].AddSword, L" 禦劍");
+                    showBonus(RMagic[mnum].AddKnife, L" 耍刀");
+                    showBonus(RMagic[mnum].AddUnusual, L" 奇門");
+                    showBonus(RMagic[mnum].AddHidWeapon, L" 暗器");
+                }
+
+                if (RMagic[mnum].BattleState > 0 && lv >= RMagic[mnum].MaxLevel)
+                {
+                    str = L" 功體特效 ";
+                    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10, y3 + 115 + (i1 / 4) * 22, ColColor(0, 0x21), ColColor(0, 0x23));
+                    const wchar_t* bsNames[] = { L"", L" 體力不減", L" 女性武功威力加成", L" 飲酒功效加倍",
+                        L" 隨機傷害轉移", L" 隨機傷害反噬", L" 內傷免疫", L" 殺傷體力",
+                        L" 增加閃躲幾率", L" 攻擊力隨等级循环增减", L" 內力消耗減少",
+                        L" 每回合恢復生命", L" 負面狀態免疫", L" 全部武功威力加成",
+                        L" 隨機二次攻擊", L" 拳掌武功威力加成", L" 劍術武功威力加成",
+                        L" 刀法武功威力加成", L" 奇門武功威力加成", L" 增加內傷幾率",
+                        L" 增加封穴幾率", L" 攻擊微量吸血", L" 攻擊距離增加",
+                        L" 每回合恢復內力", L" 使用暗器距離增加", L" 附加殺傷吸收內力" };
+                    int bsIdx = RMagic[mnum].BattleState;
+                    if (bsIdx >= 1 && bsIdx <= 25)
+                    {
+                        str = bsNames[bsIdx];
+                        DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), x3 - 10, y3 + 137 + (i1 / 4) * 22, ColColor(0, 0x64), ColColor(0, 0x66));
+                    }
+                }
+            }
+            max2++;
+        }
+    }
+}
+int StadyGongtiMenu(int x, int y, int w)
+{
+    int menu = 0;
+    RegionRect.w = 1;
+    RegionRect.h = 0;
+    ShowCommonMenu2(x, y, w, menu);
+    SDL_UpdateRect2(screen, x, y, w + 1, 29);
+    SDL_Event ev;
+    while (SDL_WaitEvent(&ev))
+    {
+        CheckBasicEvent();
+        if (ev.type == SDL_EVENT_KEY_DOWN)
+        {
+            if (ev.key.key == SDLK_LEFT || ev.key.key == SDLK_RIGHT)
+            {
+                menu = 1 - menu;
+                ShowCommonMenu2(x, y, w, menu);
+                SDL_UpdateRect2(screen, x, y, w + 1, 29);
+            }
+        }
+        if (ev.type == SDL_EVENT_KEY_UP)
+        {
+            if (ev.key.key == SDLK_ESCAPE && Where <= 2) { RegionRect.w = 0; return -1; }
+            if (ev.key.key == SDLK_RETURN || ev.key.key == SDLK_SPACE) { RegionRect.w = 0; return menu; }
+        }
+        if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP)
+        {
+            if (ev.button.button == SDL_BUTTON_RIGHT && Where <= 2) { RegionRect.w = 0; return -1; }
+            if (ev.button.button == SDL_BUTTON_LEFT) { RegionRect.w = 0; return menu; }
+        }
+        if (ev.type == SDL_EVENT_MOUSE_MOTION)
+        {
+            int xm, ym;
+            SDL_GetMouseState2(xm, ym);
+            if (xm >= x && xm < x + w && ym > y && ym < y + 29)
+            {
+                int newmenu = (xm - x - 2) / 50;
+                if (newmenu > 1) newmenu = 1;
+                if (newmenu < 0) newmenu = 0;
+                if (newmenu != menu)
+                {
+                    menu = newmenu;
+                    ShowCommonMenu2(x, y, w, menu);
+                    SDL_UpdateRect2(screen, x, y, w + 1, 29);
+                }
+            }
+        }
+    }
+    RegionRect.w = 0;
+    return -1;
+}
+void GongtiLevelUp(int rnum, int mnum)
+{
+    if (mnum != RRole[rnum].Gongti) return;
+    int lv = GetGongtiLevel(rnum, mnum);
+    RRole[rnum].CurrentHP -= RMagic[mnum].AddHP[lv];
+    RRole[rnum].CurrentMP -= RMagic[mnum].AddMP[lv];
+    RRole[rnum].MaxHP -= RMagic[mnum].AddHP[lv];
+    RRole[rnum].MaxMP -= RMagic[mnum].AddMP[lv];
+    RRole[rnum].CurrentHP += RMagic[mnum].AddHP[lv + 1];
+    RRole[rnum].CurrentMP += RMagic[mnum].AddMP[lv + 1];
+    RRole[rnum].MaxHP += RMagic[mnum].AddHP[lv + 1];
+    RRole[rnum].MaxMP += RMagic[mnum].AddMP[lv + 1];
+    RRole[rnum].CurrentHP = std::max<int16_t>(RRole[rnum].CurrentHP, 0);
+    RRole[rnum].CurrentMP = std::max<int16_t>(RRole[rnum].CurrentMP, 0);
+}
+void AddSkillPoint(int num)
+{
+    RRole[0].AddSkillPoint += static_cast<int16_t>(num);
+    DrawRectangle(CENTER_X - 75, 98, 145, 30, 0, ColColor(0, 255), 30);
+    std::wstring word = L" 得到技能點  ";
+    DrawShadowText(reinterpret_cast<uint16_t*>(word.data()), CENTER_X - 90, 100, ColColor(0, 0x5), ColColor(0, 0x7));
+    word = std::format(L"{}", num);
+    DrawEngShadowText(reinterpret_cast<uint16_t*>(word.data()), CENTER_X + 50, 100, ColColor(0, 0x64), ColColor(0, 0x66));
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    WaitAnyKey();
+    Redraw();
+}
+bool AddBattleStateToEquip()
+{
+    Redraw();
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+
+    const wchar_t* stateNames[] = {
+        L"", L"體力不減", L"女性武功威力加成", L"飲酒功效加倍",
+        L"隨機傷害轉移", L"隨機傷害反噬", L"內傷免疫", L"殺傷體力",
+        L"增加閃躲幾率", L"攻擊力隨等级循环增减", L"內力消耗減少",
+        L"每回合恢復生命", L"負面狀態免疫", L"全部武功威力加成",
+        L"隨機二次攻擊", L"拳掌武功威力加成", L"劍術武功威力加成",
+        L"刀法武功威力加成", L"奇門武功威力加成", L"增加內傷幾率",
+        L"增加封穴幾率", L"攻擊微量吸血", L"攻擊距離增加",
+        L"每回合恢復內力", L"使用暗器距離增加", L"附加殺傷吸收內力"
+    };
+
+    int state[26] = {};
+    int n = 0;
+    std::vector<int16_t> battlestate;
+
+    for (int i = 0; i < 36; i++)
+    {
+        if (RRole[i].TeamState == 1 || RRole[i].TeamState == 2)
+        {
+            for (int i1 = 0; i1 < 10; i1++)
+            {
+                if (RRole[i].Magic[i1] > 0 && RMagic[RRole[i].Magic[i1]].MagicType == 5
+                    && RMagic[RRole[i].Magic[i1]].BattleState > 0
+                    && GetGongtiLevel(i, RRole[i].Magic[i1]) >= RMagic[RRole[i].Magic[i1]].MaxLevel)
+                {
+                    state[RMagic[RRole[i].Magic[i1]].BattleState] = 1;
+                }
+            }
+        }
+    }
+
+    MenuString.clear();
+    MenuEngString.clear();
+    for (int i = 1; i <= 25; i++)
+    {
+        if (state[i] == 1)
+        {
+            n++;
+            MenuString.push_back(stateNames[i]);
+            battlestate.push_back(static_cast<int16_t>(i));
+        }
+    }
+    if (n == 0)
+    {
+        Redraw();
+        std::wstring str1 = L"沒有可用功體特效";
+        DrawTextWithRect(reinterpret_cast<uint16_t*>(str1.data()), 320 - 85, 45, 170, ColColor(0x21), ColColor(0x23));
+        WaitAnyKey();
+        return false;
+    }
+
+    std::wstring title = L"選擇功體特效";
+    int menu1 = TitleCommonScrollMenu(reinterpret_cast<uint16_t*>(title.data()),
+        ColColor(0, 5), ColColor(0, 7), 5, 5, 300, n - 1, 17);
+    if (menu1 >= 0)
+    {
+        int16_t SelectedState = battlestate[menu1];
+        n = 0;
+        MenuString.clear();
+        MenuEngString.clear();
+        std::vector<int16_t> EquipList;
+        for (int i = 0; i < static_cast<int>(RItem.size()); i++)
+        {
+            if (GetItemCount(i) > 0 && RItem[i].ItemType == 1 && RItem[i].SetNum > 0 && RItem[i].BattleEffect <= 0)
+            {
+                n++;
+                MenuString.push_back(GBKToUnicode(reinterpret_cast<const char*>(RItem[i].Name)));
+                EquipList.push_back(static_cast<int16_t>(i));
+            }
+        }
+        if (n == 0)
+        {
+            Redraw();
+            std::wstring str1 = L"沒有可注入的裝備";
+            DrawTextWithRect(reinterpret_cast<uint16_t*>(str1.data()), 320 - 85, 45, 170, ColColor(0x21), ColColor(0x23));
+            WaitAnyKey();
+            return false;
+        }
+        title = L"選擇裝備";
+        int menu2 = TitleCommonScrollMenu(reinterpret_cast<uint16_t*>(title.data()),
+            ColColor(0, 5), ColColor(0, 7), 315, 5, 300, n - 1, 17);
+        if (menu2 >= 0)
+        {
+            RItem[EquipList[menu2]].BattleEffect = SelectedState;
+            return true;
+        }
+    }
+    return false;
+}
 
 // ==== 输入 ====
-int InputAmount() { return 0; /* TODO */ }
-bool EnterString(std::string& str, int x, int y, int w, int h) { return false; /* TODO */ }
+int InputAmount()
+{
+    int amount = 0;
+    std::wstring str = L"輸入數字";
+    std::wstring countstr = std::format(L"{:5d}", amount);
+    DrawRectangle(CENTER_X - 100, CENTER_Y - 15, 200, 30, 0, ColColor(255), 100);
+    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), CENTER_X - 100, CENTER_Y - 10, ColColor(5), ColColor(7));
+    DrawEngText(screen, reinterpret_cast<uint16_t*>(countstr.data()), CENTER_X + 41, CENTER_Y - 10, ColColor(7));
+    DrawEngText(screen, reinterpret_cast<uint16_t*>(countstr.data()), CENTER_X + 40, CENTER_Y - 10, ColColor(5));
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+
+    SDL_Event ev;
+    while (SDL_WaitEvent(&ev))
+    {
+        CheckBasicEvent();
+        if (ev.type == SDL_EVENT_KEY_UP)
+        {
+            if (ev.key.key == SDLK_UP) amount += 10;
+            if (ev.key.key == SDLK_DOWN) amount -= 10;
+            if (ev.key.key == SDLK_LEFT) amount -= 1;
+            if (ev.key.key == SDLK_RIGHT) amount += 1;
+            if (amount > 32767) amount = 32767;
+            if (amount < 0) amount = 0;
+            if (ev.key.key >= SDLK_0 && ev.key.key <= SDLK_9)
+            {
+                if (amount < 3276) amount = amount * 10 + (ev.key.key - SDLK_0);
+            }
+            if (ev.key.key == SDLK_RETURN) break;
+            if (ev.key.key == SDLK_BACKSPACE) amount /= 10;
+        }
+        countstr = std::format(L"{:5d}", amount);
+        DrawRectangle(CENTER_X - 100, CENTER_Y - 15, 200, 30, 0, ColColor(255), 100);
+        DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), CENTER_X - 100, CENTER_Y - 10, ColColor(5), ColColor(7));
+        DrawEngText(screen, reinterpret_cast<uint16_t*>(countstr.data()), CENTER_X + 41, CENTER_Y - 10, ColColor(7));
+        DrawEngText(screen, reinterpret_cast<uint16_t*>(countstr.data()), CENTER_X + 40, CENTER_Y - 10, ColColor(5));
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    }
+    return amount;
+}
+bool EnterString(std::string& str, int x, int y, int w, int h)
+{
+    SDL_Rect r;
+    r.x = x; r.y = y; r.w = w; r.h = h;
+    SDL_StartTextInput(window);
+    SDL_SetTextInputArea(window, &r, 0);
+    while (true)
+    {
+        std::wstring dispStr = L" 請輸入名字：";
+        std::wstring wstr;
+        // Convert UTF-8 str to wstring for display
+        for (size_t i = 0; i < str.size(); )
+        {
+            unsigned char c = str[i];
+            wchar_t wc = 0;
+            if (c < 0x80) { wc = c; i++; }
+            else if ((c & 0xE0) == 0xC0 && i + 1 < str.size()) { wc = ((c & 0x1F) << 6) | (str[i + 1] & 0x3F); i += 2; }
+            else if ((c & 0xF0) == 0xE0 && i + 2 < str.size()) { wc = ((c & 0x0F) << 12) | ((str[i + 1] & 0x3F) << 6) | (str[i + 2] & 0x3F); i += 3; }
+            else { i++; continue; }
+            wstr += wc;
+        }
+        dispStr += wstr;
+        DrawTextWithRect(reinterpret_cast<uint16_t*>(dispStr.data()), x, y, 220, ColColor(0x66), ColColor(0x63));
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+        SDL_Event ev;
+        SDL_PollEvent(&ev);
+        if (ev.type == SDL_EVENT_TEXT_INPUT)
+        {
+            str += ev.text.text;
+        }
+        if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP && ev.button.button == SDL_BUTTON_RIGHT)
+        {
+            SDL_StopTextInput(window);
+            return false;
+        }
+        if (ev.type == SDL_EVENT_KEY_UP)
+        {
+            if (ev.key.key == SDLK_RETURN) { SDL_StopTextInput(window); return true; }
+            if (ev.key.key == SDLK_ESCAPE) { SDL_StopTextInput(window); return false; }
+            if (ev.key.key == SDLK_BACKSPACE)
+            {
+                int l2 = static_cast<int>(str.size());
+                if (l2 >= 3 && (static_cast<unsigned char>(str[l2 - 1]) >= 128))
+                    str.resize(l2 - 3);
+                else if (l2 >= 1)
+                    str.resize(l2 - 1);
+            }
+        }
+        SDL_Delay(16);
+    }
+    SDL_StopTextInput(window);
+    return false;
+}

@@ -1835,11 +1835,10 @@ void PlayMagicAmination(int bnum, int bigami, int enum_, int level)
     {
         int count = 0;
         fread(&count, 4, 1, f);
-        int fhandle = static_cast<int>(reinterpret_cast<intptr_t>(f));
         for (int i = 0; i < count; i++)
         {
             SDL_PollEvent(nullptr);
-            DrawBFieldWithEft(fhandle, i, bigami, level);
+            DrawBFieldWithEft(f, i, bigami, level);
             SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
         }
         fclose(f);
@@ -1862,13 +1861,12 @@ void PlayActionAmination(int bnum, int mode)
     {
         int count = 0;
         fread(&count, 4, 1, f);
-        int fhandle = static_cast<int>(reinterpret_cast<intptr_t>(f));
         int beginpic = BRole[bnum].Face * (count / 4);
         int endpic = beginpic + (count / 4) - 1;
         for (int i = beginpic; i <= endpic; i++)
         {
             SDL_PollEvent(nullptr);
-            DrawBFieldWithAction(fhandle, bnum, i);
+            DrawBFieldWithAction(f, bnum, i);
             SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
             SDL_Delay((40 * GameSpeed) / 10);
         }
@@ -1885,13 +1883,12 @@ void PlayActionAmination(int bnum, int mode)
             {
                 int count = 0;
                 fread(&count, 4, 1, f);
-                int fhandle = static_cast<int>(reinterpret_cast<intptr_t>(f));
                 int beginpic = BRole[bnum].Face * (count / 4);
                 int endpic = beginpic + (count / 4) - 1;
                 for (int ix = beginpic; ix <= endpic; ix++)
                 {
                     SDL_PollEvent(nullptr);
-                    DrawBFieldWithAction(fhandle, bnum, ix);
+                    DrawBFieldWithAction(f, bnum, ix);
                     SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
                     SDL_Delay((40 * GameSpeed) / 10);
                 }

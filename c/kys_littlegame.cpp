@@ -743,19 +743,519 @@ static void ExchangePic(int p1, int p2)
     std::swap(gamearray[1][p1], gamearray[1][p2]);
 }
 
+// ==== SelectPoetry (内部) ====
+static int SelectPoetry(int wx1, int wy1, int c, int Count, int len, int menu, int chance)
+{
+    int r1 = Count / c;
+    int menu1 = 0;
+    int xm = 0, ym = 0;
+    for (int i = 0; i < Count; i++)
+    {
+        if (i == menu1)
+            DrawRectangle(wx1 + (i % c) * 40 + 11, wy1 + (i / c) * 40 - 9, 39, 39, 0, ColColor(0, 5), 0);
+        else
+            DrawRectangle(wx1 + (i % c) * 40 + 11, wy1 + (i / c) * 40 - 9, 39, 39, 0, ColColor(0, 255), 0);
+    }
+    SDL_UpdateRect2(screen, 0, 0, 640, 440);
+
+    while (SDL_WaitEvent(&event))
+    {
+        CheckBasicEvent();
+        switch (event.type)
+        {
+        case SDL_EVENT_MOUSE_MOTION:
+            SDL_GetMouseState2(xm, ym);
+            if ((xm > wx1 - 11) && (xm < wx1 - 11 + 40 * c) && (ym > wy1 - 9) && (ym < wy1 - 9 + 40 * r1))
+                menu1 = ((xm - wx1 - 11) / 40) + ((ym - wy1 + 9) / 40) * c;
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            SDL_GetMouseState2(xm, ym);
+            if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                if ((xm > wx1 - 11) && (xm < wx1 - 11 + 40 * c) && (ym > wy1 - 9) && (ym < wy1 - 9 + 40 * r1))
+                    menu1 = ((xm - wx1 - 11) / 40) + ((ym - wy1 + 9) / 40) * c;
+                if ((menu1 < Count) && (menu < (int)gamearray[1].size()))
+                {
+                    int16_t w = gamearray[1][menu];
+                    gamearray[1][menu] = gamearray[2][menu1];
+                    gamearray[2][menu1] = w;
+                    chance--;
+                }
+            }
+            goto sel_done;
+        case SDL_EVENT_KEY_UP:
+            if (event.key.key == SDLK_ESCAPE)
+                goto sel_done;
+            if (event.key.key == SDLK_UP || event.key.key == SDLK_KP_8) menu1 -= c;
+            if (event.key.key == SDLK_DOWN || event.key.key == SDLK_KP_2) menu1 += c;
+            if (event.key.key == SDLK_LEFT || event.key.key == SDLK_KP_4) menu1--;
+            if (event.key.key == SDLK_RIGHT || event.key.key == SDLK_KP_6) menu1++;
+            if (menu1 < 0) menu1 += Count;
+            if (menu1 > Count - 1) menu1 -= Count;
+            if (event.key.key == SDLK_RETURN || event.key.key == SDLK_SPACE)
+            {
+                if ((menu1 < Count) && (menu < (int)gamearray[1].size()))
+                {
+                    int16_t w = gamearray[1][menu];
+                    gamearray[1][menu] = gamearray[2][menu1];
+                    gamearray[2][menu1] = w;
+                    chance--;
+                    goto sel_done;
+                }
+            }
+            break;
+        }
+        for (int i = 0; i < Count; i++)
+        {
+            if (i == menu1)
+                DrawRectangle(wx1 + (i % c) * 40 + 11, wy1 + (i / c) * 40 - 9, 39, 39, 0, ColColor(0, 5), 0);
+            else
+                DrawRectangle(wx1 + (i % c) * 40 + 11, wy1 + (i / c) * 40 - 9, 39, 39, 0, ColColor(0, 255), 0);
+        }
+        SDL_UpdateRect2(screen, 0, 0, 640, 440);
+    }
+sel_done:
+    return chance;
+}
+
 // ==== Poetry ====
 bool Poetry(int talknum, int chance, int c, int Count)
 {
     if (GetPetSkill(4, 2)) chance *= 2;
-    // TODO: 完整实现 - 需要读取对话文件、显示诗词选择界面
-    // 当前返回 false 表示失败
-    return false;
+
+    int x = 20, y = 20, wy = 160, wy1 = 300;
+    int menu = 0;
+    int16_t wd[2] = {};
+
+    // Read talk file
+    FILE* fidx = nullptr; fopen_s(&fidx, (AppPath + TALK_IDX).c_str(), "rb");
+    FILE* fgrp = nullptr; fopen_s(&fgrp, (AppPath + TALK_GRP).c_str(), "rb");
+    if (!fidx || !fgrp) { if (fidx) fclose(fidx); if (fgrp) fclose(fgrp); return false; }
+
+    int offset = 0, len = 0;
+    if (talknum == 0)
+    {
+        fread(&len, 4, 1, fidx);
+        offset = 0;
+    }
+    else
+    {
+        fseek(fidx, (talknum - 1) * 4, SEEK_SET);
+        fread(&offset, 4, 1, fidx);
+        fread(&len, 4, 1, fidx);
+    }
+    len = len - offset;
+    std::vector<uint8_t> talkarray(len + 1, 0);
+    fseek(fgrp, offset, SEEK_SET);
+    fread(talkarray.data(), 1, len, fgrp);
+    fclose(fidx);
+    fclose(fgrp);
+
+    for (int i = 0; i < len; i++)
+    {
+        talkarray[i] ^= 0xFF;
+        if (talkarray[i] == 0xFF) talkarray[i] = 0;
+    }
+
+    uint16_t* poet = reinterpret_cast<uint16_t*>(talkarray.data());
+    int wlen = len / 2;
+
+    gamearray.resize(3);
+    gamearray[0].resize(wlen);
+    gamearray[1].resize(wlen);
+    gamearray[2].resize(Count);
+
+    for (int i = 0; i < wlen; i++) { gamearray[0][i] = 0; gamearray[1][i] = 0; }
+    for (int i = 0; i < Count; i++) { gamearray[2][i] = 0x2020; }
+
+    for (int i = 0; i < wlen; i++)
+    {
+        gamearray[0][i] = poet[i];
+        int n = rand() % wlen;
+        while (gamearray[1][n] != 0) n = rand() % wlen;
+        gamearray[1][n] = gamearray[0][i];
+    }
+
+    int row = wlen / c;
+    int r1 = row;
+
+    Redraw();
+    DrawRectangleWithoutFrame(x, y, 600, 400, 0, 60);
+
+    int wx = CENTER_X - c * 20 - 12;
+    int wx1 = CENTER_X - (Count / r1) * 20 - 12;
+    DrawRectangle(wx1 + 11, wy1 - 9, (Count / r1) * 40 - 1, r1 * 40 - 1, 0, ColColor(0, 255), 0);
+    DrawRectangle(wx + 11, wy - 9, c * 40 - 1, row * 40 - 1, 0, ColColor(0, 255), 0);
+    DrawRectangle(CENTER_X - c * 20 - 1, y + 15, c * 40 - 1, 39, 0, ColColor(0, 255), 0);
+
+    for (int i = 0; i < wlen; i++)
+    {
+        wd[0] = gamearray[1][i];
+        DrawGBKShadowText(reinterpret_cast<const char*>(wd), wx + (i % c) * 40, wy + (i / c) * 40, ColColor(0, 5), ColColor(0, 7));
+    }
+    for (int i = 0; i < Count; i++)
+    {
+        wd[0] = gamearray[2][i];
+        DrawGBKShadowText(reinterpret_cast<const char*>(wd), wx1 + (i % (Count / r1)) * 40, wy1 + (i / (Count / r1)) * 40, ColColor(0, 5), ColColor(0, 7));
+    }
+    DrawRectangle(wx + (menu % c) * 40 + 11, wy + (menu / c) * 40 - 9, 39, 39, 0, ColColor(0, 255), 0);
+
+    std::wstring str = L"\u6A5F\u6703\uFF1A";
+    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), wx + 10, y + 25, ColColor(0, 5), ColColor(0, 7));
+    str = std::to_wstring(chance);
+    DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), wx + 80, y + 25, ColColor(0, 5), ColColor(0, 7));
+
+    SDL_UpdateRect2(screen, 0, 0, 640, 440);
+
+    bool result = false;
+    int xm = 0, ym = 0;
+    while (SDL_WaitEvent(&event))
+    {
+        CheckBasicEvent();
+        switch (event.type)
+        {
+        case SDL_EVENT_KEY_UP:
+            if (event.key.key == SDLK_ESCAPE) { gamearray.clear(); return false; }
+            if (event.key.key == SDLK_UP || event.key.key == SDLK_KP_8) menu -= c;
+            if (event.key.key == SDLK_DOWN || event.key.key == SDLK_KP_2) menu += c;
+            if (event.key.key == SDLK_LEFT || event.key.key == SDLK_KP_4) menu--;
+            if (event.key.key == SDLK_RIGHT || event.key.key == SDLK_KP_6) menu++;
+            if (menu < 0) menu += c * row;
+            if (menu > c * row - 1) menu -= c * row;
+            if (event.key.key == SDLK_RETURN || event.key.key == SDLK_SPACE)
+            {
+                chance = SelectPoetry(wx1, wy1, Count / r1, Count, wlen, menu, chance);
+                SDL_UpdateRect2(screen, 0, 0, 640, 440);
+            }
+            break;
+        case SDL_EVENT_MOUSE_MOTION:
+            SDL_GetMouseState2(xm, ym);
+            if ((xm > wx - 11) && (xm < wx - 11 + 40 * c) && (ym > wy - 9) && (ym < wy - 9 + 40 * row))
+                menu = ((xm - wx - 11) / 40) + ((ym - wy + 9) / 40) * c;
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                SDL_GetMouseState2(xm, ym);
+                if ((xm > wx - 11) && (xm < wx - 11 + 40 * c) && (ym > wy - 9) && (ym < wy - 9 + 40 * r1))
+                    menu = ((xm - wx - 11) / 40) + ((ym - wy + 9) / 40) * c;
+                chance = SelectPoetry(wx1, wy1, Count / r1, Count, wlen, menu, chance);
+                SDL_UpdateRect2(screen, 0, 0, 640, 440);
+            }
+            break;
+        }
+
+        Redraw();
+        DrawRectangleWithoutFrame(x, y, 600, 400, 0, 60);
+        DrawRectangle(wx1 + 11, wy1 - 9, (Count / r1) * 40 - 1, r1 * 40 - 1, 0, ColColor(0, 255), 0);
+        DrawRectangle(wx + 11, wy - 9, c * 40 - 1, row * 40 - 1, 0, ColColor(0, 255), 0);
+        DrawRectangle(CENTER_X - c * 20 - 1, y + 15, c * 40 - 1, 39, 0, ColColor(0, 255), 0);
+
+        for (int i = 0; i < wlen; i++)
+        {
+            wd[0] = gamearray[1][i];
+            DrawGBKShadowText(reinterpret_cast<const char*>(wd), wx + (i % c) * 40, wy + (i / c) * 40, ColColor(0, 5), ColColor(0, 7));
+        }
+        for (int i = 0; i < Count; i++)
+        {
+            wd[0] = gamearray[2][i];
+            DrawGBKShadowText(reinterpret_cast<const char*>(wd), wx1 + (i % (Count / r1)) * 40, wy1 + (i / (Count / r1)) * 40, ColColor(0, 5), ColColor(0, 7));
+        }
+        DrawRectangle(wx + (menu % c) * 40 + 11, wy + (menu / c) * 40 - 9, 39, 39, 0, ColColor(0, 255), 0);
+
+        str = L"\u6A5F\u6703\uFF1A";
+        DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), wx + 10, y + 25, ColColor(0, 5), ColColor(0, 7));
+        str = std::to_wstring(chance);
+        DrawShadowText(reinterpret_cast<uint16_t*>(str.data()), wx + 80, y + 25, ColColor(0, 5), ColColor(0, 7));
+
+        SDL_UpdateRect2(screen, 0, 0, 640, 440);
+
+        result = true;
+        for (int i = 0; i < Count; i++)
+        {
+            if (gamearray[0][i] != gamearray[2][i])
+            {
+                result = false;
+                break;
+            }
+        }
+        if (result)
+        {
+            SDL_Delay(1000);
+            gamearray.clear();
+            break;
+        }
+        if (chance == 0)
+        {
+            SDL_Delay(1000);
+            result = true;
+            for (int i = 0; i < Count; i++)
+            {
+                if (gamearray[0][i] != gamearray[2][i])
+                {
+                    result = false;
+                    gamearray.clear();
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    return result;
 }
 
 // ==== rotoSpellPicture ====
 bool rotoSpellPicture(int num, int chance)
 {
     if (GetPetSkill(4, 2)) chance *= 2;
-    // TODO: 完整实现 - 拼图旋转游戏
-    return false;
+
+    gamearray.resize(2);
+    gamearray[0].resize(25);
+    gamearray[1].resize(25);
+
+    int menu = 0, menu2 = -1;
+    int x = 150, y = 5, w = 410, h = 440;
+    int right = 0;
+
+    TPic gamepic{};
+    if (std::filesystem::exists(AppPath + GAME_file))
+    {
+        FILE* grpf = nullptr; fopen_s(&grpf, (AppPath + GAME_file).c_str(), "rb");
+        gamepic = GetPngPic(grpf, num + 3);
+        fclose(grpf);
+    }
+
+    for (int i = 0; i < 25; i++)
+    {
+        gamearray[0][i] = -1;
+        gamearray[1][i] = rand() % 4;
+    }
+    for (int i = 0; i < 25; i++)
+    {
+        while (true)
+        {
+            int r = rand() % 25;
+            if (gamearray[0][r] == -1)
+            {
+                gamearray[0][r] = i;
+                break;
+            }
+        }
+    }
+
+    SDL_Surface* pic[4][25] = {};
+    for (int i = 0; i < 25; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            SDL_Surface* temp = SDL_CreateSurface(80, 80, SDL_GetPixelFormatForMasks(32, RMask, GMask, BMask, AMask));
+            pic[j][i] = SDL_CreateSurface(80, 80, SDL_GetPixelFormatForMasks(32, RMask, GMask, BMask, AMask));
+            SDL_Rect srcrect;
+            srcrect.x = (i % 5) * 80;
+            srcrect.y = (i / 5) * 80;
+            srcrect.w = 80;
+            srcrect.h = 80;
+            SDL_BlitSurface(gamepic.pic, &srcrect, temp, nullptr);
+
+            for (int i1 = 0; i1 < 80; i1++)
+            {
+                for (int i2 = 0; i2 < 80; i2++)
+                {
+                    switch (j)
+                    {
+                    case 0: putpixel(pic[j][i], i1, i2, getpixel(temp, i1, i2)); break;
+                    case 1: putpixel(pic[j][i], i1, i2, getpixel(temp, i2, 79 - i1)); break;
+                    case 2: putpixel(pic[j][i], i1, i2, getpixel(temp, 79 - i1, 79 - i2)); break;
+                    case 3: putpixel(pic[j][i], i1, i2, getpixel(temp, 79 - i2, i1)); break;
+                    }
+                }
+            }
+            SDL_DestroySurface(temp);
+        }
+    }
+    SDL_Surface* littlegamepic = rotozoomSurfaceXY(gamepic.pic, 0, 0.3, 0.3, 0);
+    SDL_DestroySurface(gamepic.pic);
+
+    bool result = false;
+    int xm = 0, ym = 0;
+
+    auto drawBoard = [&]()
+    {
+        DrawRectangle(x - 5, y - 5, w, h, 0, ColColor(255), 100);
+        DrawRectangle(x - 5 - 140, y - 5, 130, 130, 0, ColColor(255), 100);
+        SDL_Rect sr;
+        sr.x = x - 140; sr.y = y; sr.w = 120; sr.h = 120;
+        SDL_BlitSurface(littlegamepic, nullptr, screen, &sr);
+
+        for (int i = 0; i < 25; i++)
+        {
+            SDL_Rect r;
+            r.x = (i % 5) * 80 + x;
+            r.y = (i / 5) * 80 + y + 30;
+            r.w = 80; r.h = 80;
+            SDL_BlitSurface(pic[gamearray[1][i]][gamearray[0][i]], nullptr, screen, &r);
+        }
+        if (menu2 > -1)
+            DrawRectangle((menu2 % 5) * 80 + x, (menu2 / 5) * 80 + y + 30, 80, 80, 0, ColColor(0x64), 0);
+        if (menu > -1)
+            DrawRectangle((menu % 5) * 80 + x, (menu / 5) * 80 + y + 30, 80, 80, 0, ColColor(0xFF), 0);
+
+        std::wstring word = L"\u6A5F\u6703";
+        std::wstring word1 = L"\u547D\u4E2D";
+        DrawShadowText(reinterpret_cast<uint16_t*>(word.data()), x + 5, y + 5, ColColor(5), ColColor(7));
+        DrawShadowText(reinterpret_cast<uint16_t*>(word1.data()), x + 200, y + 5, ColColor(5), ColColor(7));
+        word = std::to_wstring(chance);
+        word1 = std::to_wstring(right);
+        DrawShadowText(reinterpret_cast<uint16_t*>(word.data()), x + 55, y + 5, ColColor(5), ColColor(7));
+        DrawShadowText(reinterpret_cast<uint16_t*>(word1.data()), x + 250, y + 5, ColColor(5), ColColor(7));
+        SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    };
+
+    // Show original picture briefly
+    Redraw();
+    DrawRectangle(x - 5, y - 5, w, h, 0, ColColor(255), 100);
+    for (int i = 0; i < 25; i++)
+    {
+        SDL_Rect sr;
+        sr.x = (i % 5) * 80 + x;
+        sr.y = (i / 5) * 80 + y + 30;
+        sr.w = 80; sr.h = 80;
+        SDL_BlitSurface(pic[0][i], nullptr, screen, &sr);
+    }
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    SDL_Delay(2000);
+
+    drawBoard();
+
+    while (SDL_WaitEvent(&event))
+    {
+        CheckBasicEvent();
+        int menu1 = menu;
+        switch (event.type)
+        {
+        case SDL_EVENT_KEY_UP:
+            if (event.key.key == SDLK_ESCAPE)
+            {
+                if (menu2 > -1)
+                    menu2 = -1;
+                else
+                {
+                    result = false;
+                    goto roto_cleanup;
+                }
+            }
+            if (event.key.key == SDLK_UP || event.key.key == SDLK_KP_8) menu -= 5;
+            if (event.key.key == SDLK_DOWN || event.key.key == SDLK_KP_2) menu += 5;
+            if (event.key.key == SDLK_LEFT || event.key.key == SDLK_KP_4) menu--;
+            if (event.key.key == SDLK_RIGHT || event.key.key == SDLK_KP_6) menu++;
+            if (menu > 24) menu -= 25;
+            if (menu < 0) menu += 25;
+            if (menu1 > -1)
+            {
+                SDL_Rect sr;
+                sr.x = (menu1 % 5) * 80 + x;
+                sr.y = (menu1 / 5) * 80 + y + 30;
+                sr.w = 80; sr.h = 80;
+                SDL_BlitSurface(pic[gamearray[1][menu1]][gamearray[0][menu1]], nullptr, screen, &sr);
+            }
+            if (event.key.key == SDLK_SPACE)
+            {
+                if (menu2 > -1)
+                {
+                    ExchangePic(menu, menu2);
+                    menu2 = -1;
+                    chance--;
+                }
+                else if (menu > -1)
+                    menu2 = menu;
+            }
+            if (event.key.key == SDLK_RETURN)
+            {
+                gamearray[1][menu]++;
+                if (gamearray[1][menu] > 3) gamearray[1][menu] = 0;
+                SDL_Rect sr;
+                sr.x = (menu % 5) * 80 + x;
+                sr.y = (menu / 5) * 80 + y + 30;
+                sr.w = 80; sr.h = 80;
+                SDL_BlitSurface(pic[gamearray[1][menu]][gamearray[0][menu]], nullptr, screen, &sr);
+            }
+            break;
+        case SDL_EVENT_MOUSE_MOTION:
+            SDL_GetMouseState2(xm, ym);
+            if (menu > -1) menu1 = menu;
+            if ((xm > x) && (xm < x - 5 + w) && (ym > y) && (ym < y - 5 + h))
+            {
+                menu = ((xm - x) / 80) + ((ym - y - 30) / 80) * 5;
+                if (menu > 24) menu = -1;
+                if (menu != menu1 && menu1 > -1)
+                {
+                    SDL_Rect sr;
+                    sr.x = (menu1 % 5) * 80 + x;
+                    sr.y = (menu1 / 5) * 80 + y + 30;
+                    sr.w = 80; sr.h = 80;
+                    SDL_BlitSurface(pic[gamearray[1][menu1]][gamearray[0][menu1]], nullptr, screen, &sr);
+                }
+            }
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (event.button.button == SDL_BUTTON_RIGHT)
+            {
+                if (menu2 > -1)
+                    menu2 = -1;
+                else
+                {
+                    gamearray[1][menu]++;
+                    if (gamearray[1][menu] > 3) gamearray[1][menu] = 0;
+                    SDL_Rect sr;
+                    sr.x = (menu % 5) * 80 + x;
+                    sr.y = (menu / 5) * 80 + y + 30;
+                    sr.w = 80; sr.h = 80;
+                    SDL_BlitSurface(pic[gamearray[1][menu]][gamearray[0][menu]], nullptr, screen, &sr);
+                }
+            }
+            if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                if (menu2 > -1)
+                {
+                    ExchangePic(menu, menu2);
+                    menu2 = -1;
+                    chance--;
+                }
+                else if (menu > -1)
+                    menu2 = menu;
+            }
+            break;
+        }
+
+        right = 0;
+        for (int i = 0; i < 25; i++)
+        {
+            if (gamearray[0][i] == i && gamearray[1][i] == 0)
+                right++;
+        }
+        drawBoard();
+
+        if (right == 25) result = true;
+        else result = false;
+        if (result)
+        {
+            SDL_Delay(700);
+            WaitAnyKey();
+            break;
+        }
+        else if (chance == 0)
+        {
+            SDL_Delay(700);
+            WaitAnyKey();
+            break;
+        }
+    }
+
+roto_cleanup:
+    gamearray.clear();
+    for (int i = 0; i < 25; i++)
+        for (int j = 0; j < 4; j++)
+            SDL_DestroySurface(pic[j][i]);
+    SDL_DestroySurface(littlegamepic);
+    return result;
 }

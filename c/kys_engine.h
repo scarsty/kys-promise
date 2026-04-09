@@ -87,8 +87,8 @@ void DrawRoleOnBfield(int x, int y);
 void InitialWholeBField();
 void LoadBfieldPart(int x, int y);
 void DrawBFieldWithCursor(int AttAreaType, int step, int range);
-void DrawBFieldWithEft(int f, int Epicnum, int bigami, int level);
-void DrawBFieldWithAction(int f, int bnum, int Apicnum);
+void DrawBFieldWithEft(FILE* f, int Epicnum, int bigami, int level);
+void DrawBFieldWithAction(FILE* f, int bnum, int Apicnum);
 
 // ---- KG新增的函数 ----
 void InitNewPic(int num, int px, int py, int x, int y, int w, int h);

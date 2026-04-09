@@ -22,7 +22,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{7A5B0D7D-8269-4AD4-BE76-B673D3A4B7C0}</ProjectGuid>
-    <RootNamespace>kyspromisecpp</RootNamespace>
+    <RootNamespace>kyspromisec</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
