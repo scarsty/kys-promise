@@ -1073,6 +1073,9 @@ void Redraw()
 void SDL_UpdateRect2(SDL_Surface* surf, int x, int y, int w, int h)
 {
     if (render == nullptr || screenTex == nullptr) return;
+    DrawVirtualKey();
+    if (virtualKeyScr != nullptr)
+        SDL_BlitSurface(virtualKeyScr, nullptr, surf, nullptr);
     SDL_UpdateTexture(screenTex, nullptr, surf->pixels, surf->pitch);
 
     if (CellPhone == 1 && KEEP_SCREEN_RATIO == 1)
@@ -1186,7 +1189,34 @@ TStretchInfo KeepRatioScale(int w1, int h1, int w2, int h2)
 void DrawVirtualKey()
 {
     if (ShowVirtualKey == 0 || CellPhone == 0) return;
-    // TODO: 实现虚拟按键绘制
+    if (virtualKeyScr == nullptr) return;
+
+    SDL_FillSurfaceRect(virtualKeyScr, nullptr, SDL_MapSurfaceRGBA(virtualKeyScr, 0, 0, 0, 0));
+
+    SDL_Rect rect{ 0, 0, 0, 0 };
+    rect.x = VirtualKeyX;
+    rect.y = VirtualKeyY;
+    if (VirtualKeyU != nullptr) SDL_BlitSurface(VirtualKeyU, nullptr, virtualKeyScr, &rect);
+
+    rect.x = VirtualKeyX - VirtualKeySize;
+    rect.y = VirtualKeyY + VirtualKeySize;
+    if (VirtualKeyL != nullptr) SDL_BlitSurface(VirtualKeyL, nullptr, virtualKeyScr, &rect);
+
+    rect.x = VirtualKeyX;
+    rect.y = VirtualKeyY + VirtualKeySize * 2;
+    if (VirtualKeyD != nullptr) SDL_BlitSurface(VirtualKeyD, nullptr, virtualKeyScr, &rect);
+
+    rect.x = VirtualKeyX + VirtualKeySize;
+    rect.y = VirtualKeyY + VirtualKeySize;
+    if (VirtualKeyR != nullptr) SDL_BlitSurface(VirtualKeyR, nullptr, virtualKeyScr, &rect);
+
+    rect.x = 0;
+    rect.y = 0;
+    if (VirtualKeyB != nullptr) SDL_BlitSurface(VirtualKeyB, nullptr, virtualKeyScr, &rect);
+
+    rect.x = virtualKeyScr->w - 100;
+    rect.y = virtualKeyScr->h - 100;
+    if (VirtualKeyA != nullptr) SDL_BlitSurface(VirtualKeyA, nullptr, virtualKeyScr, &rect);
 }
 
 uint32 CheckBasicEvent()
@@ -1217,7 +1247,32 @@ uint32 CheckBasicEvent()
 
 void QuitConfirm()
 {
-    // TODO: 实现退出确认对话框
+    if (AskingQuit) return;
+    AskingQuit = true;
+
+    SDL_Surface* temp = SDL_ConvertSurface(screen, screen->format);
+    if (temp == nullptr)
+    {
+        AskingQuit = false;
+        return;
+    }
+
+    DrawRectangleWithoutFrame(0, 0, screen->w, screen->h, 0, 50);
+    MenuString.clear();
+    MenuString.push_back(L" 取消");
+    MenuString.push_back(L" 確認");
+    if (CommonMenu(CENTER_X * 2 - 50, 2, 45, 1) == 1)
+    {
+        SDL_DestroySurface(temp);
+        AskingQuit = false;
+        Quit();
+        return;
+    }
+
+    SDL_BlitSurface(temp, nullptr, screen, nullptr);
+    SDL_DestroySurface(temp);
+    SDL_UpdateRect2(screen, 0, 0, screen->w, screen->h);
+    AskingQuit = false;
 }
 
 void resetpallet()

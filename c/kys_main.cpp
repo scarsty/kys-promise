@@ -211,6 +211,8 @@ int Run(int argc, char* argv[])
         SDL_TEXTUREACCESS_STREAMING, CENTER_X * 2, CENTER_Y * 2);
     freshscreen = SDL_CreateSurface(CENTER_X * 2, CENTER_Y * 2,
         SDL_GetPixelFormatForMasks(32, RMask, GMask, BMask, AMask));
+    virtualKeyScr = SDL_CreateSurface(CENTER_X * 2, CENTER_Y * 2,
+        SDL_GetPixelFormatForMasks(32, RMask, GMask, BMask, AMask));
 
     SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(EventFilter), nullptr);
 
@@ -221,6 +223,7 @@ int Run(int argc, char* argv[])
 
     TTF_CloseFont(Font);
     TTF_CloseFont(EngFont);
+    if (virtualKeyScr != nullptr) { SDL_DestroySurface(virtualKeyScr); virtualKeyScr = nullptr; }
     TTF_Quit();
     MIX_Quit();
     SDL_Quit();
@@ -231,6 +234,7 @@ void Quit()
 {
     TTF_CloseFont(Font);
     TTF_CloseFont(EngFont);
+    if (virtualKeyScr != nullptr) { SDL_DestroySurface(virtualKeyScr); virtualKeyScr = nullptr; }
     TTF_Quit();
     MIX_Quit();
     SDL_Quit();
