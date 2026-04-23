@@ -33,3 +33,5 @@ kys-promise-androidstudio/build
 *.so
 *.apk
 c/.vs/
+bin-c/.vs
+bin-c/.vscode

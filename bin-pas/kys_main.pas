@@ -463,9 +463,9 @@ var
   GameArray: array of array of integer;
   GameSpeed: integer = 10;
   MusicVolume: integer = 64;
-  Music: array[0..109] of MIX_Audio;
-  ESound: array[0..186] of MIX_Audio;
-  ASound: array[0..99] of MIX_Audio;
+  Music: array[0..109] of PMIX_Audio;
+  ESound: array[0..186] of PMIX_Audio;
+  ASound: array[0..99] of PMIX_Audio;
   nowmusic: integer;
 
   //战斗用变量

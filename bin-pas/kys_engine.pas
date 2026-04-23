@@ -191,9 +191,9 @@ implementation
 uses kys_event;
 
 var
-  gMixer: MIX_Mixer = nil;
-  MusicTrack: MIX_Track = nil;
-  SfxTracks: array[0..9] of MIX_Track;
+  gMixer: PMIX_Mixer = nil;
+  MusicTrack: PMIX_Track = nil;
+  SfxTracks: array[0..9] of PMIX_Track;
   SfxNextTrack: integer = 0;
 
 function EnsureMixerCreated: boolean;
@@ -212,12 +212,12 @@ begin
   Result := gMixer <> nil;
 end;
 
-function EnsureTrackForAudio(var track: MIX_Track; audio: MIX_Audio): boolean;
+function EnsureTrackForAudio(var track: PMIX_Track; audio: PMIX_Audio): boolean;
 begin
   Result := MIX_SetTrackAudio(track, audio);
 end;
 
-function AcquireSfxTrack(audio: MIX_Audio): MIX_Track;
+function AcquireSfxTrack(audio: PMIX_Audio): PMIX_Track;
 var
   idx: integer;
 begin
@@ -260,9 +260,9 @@ var
   i: integer;
   str: ansistring;
 
-  function LoadMid(filename: ansistring): MIX_Audio;
+  function LoadMid(filename: ansistring): PMIX_Audio;
   var
-    id: SDL_PropertiesID;
+    id: TSDL_PropertiesID;
     io: PSDL_IOStream;
     sf2: ansistring;
   begin
@@ -375,7 +375,7 @@ end;
 procedure PlaySoundE(SoundNum, times: integer); overload;
 var
   loops: integer;
-  track: MIX_Track;
+  track: PMIX_Track;
 begin
   if times = -1 then loops := -1 else loops := 0;
   if (SoundNum >= 0) and (SoundNum < length(Esound)) and (SoundVOLUME > 0) then
@@ -406,7 +406,7 @@ end;
 procedure PlaySoundA(SoundNum, times: integer);
 var
   loops: integer;
-  track: MIX_Track;
+  track: PMIX_Track;
 begin
   if times = -1 then loops := -1 else loops := 0;
   if (SoundNum >= Low(Asound)) and (SoundNum <= High(Asound)) and (SoundVOLUME > 0) then
