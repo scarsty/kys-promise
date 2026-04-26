@@ -1088,7 +1088,7 @@ begin
             BlendRGB255(pix1, pix2, pix3, col1, col2, col3, alpha);
             //   c := 0 ;
 
-            p := Pointer(uint32(screen.pixels) + (y1 + i2) * screen.pitch + (x1 + i1) * bpp);
+            p := Pointer(nativeuint(screen.pixels) + (y1 + i2) * screen.pitch + (x1 + i1) * bpp);
 
             if HighLight then //高亮
             begin
@@ -1116,7 +1116,7 @@ begin
               b := snowalpha[0][b];
               if b > 128 then b := b - 256;
 
-              p := Pointer(uint32(screen.pixels) + (y1 + i2) * screen.pitch + (x1 + i1 + b) * bpp);
+              p := Pointer(nativeuint(screen.pixels) + (y1 + i2) * screen.pitch + (x1 + i1 + b) * bpp);
               pix := PUint32(p)^;
               pix1 := (pix shr 16) and $FF;
               pix2 := (pix shr 8) and $FF;
