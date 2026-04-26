@@ -2360,6 +2360,7 @@ var
 begin
   if (Bfield[2, x, y] >= 0) then num := Rrole[Brole[Bfield[2, x, y]].rnum].HeadNum * 4 + Brole[Bfield[2, x, y]].Face + BEGIN_BATTLE_ROLE_PIC
   else if (Bfield[5, x, y] >= 0) then num := Rrole[Brole[Bfield[5, x, y]].rnum].HeadNum * 4 + Brole[Bfield[5, x, y]].Face + BEGIN_BATTLE_ROLE_PIC;
+  if num >= length(WIdx) then exit;
   pidx := @WIdx[0];
   ppic := @WPic[0];
   if num = 0 then
@@ -2369,6 +2370,7 @@ begin
     Inc(Pidx, num - 1);
     offset := Pidx^;
   end;
+  if offset >= length(WPic) then exit;
   Inc(Ppic, offset);
   w := Psmallint((Ppic))^;
   Inc(Ppic, 2);
