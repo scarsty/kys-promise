@@ -1803,8 +1803,10 @@ begin
       if (((l1 >= 4) and (l2 >= 4) and (l3 >= 4) and (l4 >= 4) and ((i1 = 0) or (i1 = w) or (i2 = 0) or (i2 = h))) or ((l1 = 4) or (l2 = 4) or (l3 = 4) or (l4 = 4))) then
       begin
         //a := round(200 - min(abs(i1/w-0.5),abs(i2/h-0.5))*2 * 100);
-        a := round(250 - abs(i1 / w + i2 / h - 1) * 150);
-        //writeln(a);
+        if (w > 0) and (h > 0) then
+          a := trunc(250 - abs(i1*1.0 / w + i2*1.0 / h - 1) * 150)
+        else
+          a := 250;
         PutPixel(tempsur1, i1 + x1, i2 + y1, SDL_MapSurfaceRGBA(tempscr, r1, g1, b1, a));
       end;
     end;
