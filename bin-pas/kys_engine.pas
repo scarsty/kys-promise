@@ -724,6 +724,7 @@ var
   l, l1: byte;
   alphe, pix: uint32;
   pix1, pix2, pix3, pix4: byte;
+  clearX1, clearY1, clearX2, clearY2: integer;
 begin
 
   if rs = 0 then
@@ -753,12 +754,16 @@ begin
   if (py - ys + h < rectarea.y) and (py - ys < rectarea.y) then exit;
   if (py - ys + h > rectarea.y + rectarea.h) and (py - ys > rectarea.y + rectarea.h) then exit;
   if mask = 1 then
-    for i1 := rectarea.x to rectarea.x + rectarea.w do
-      for i2 := rectarea.y to rectarea.y + rectarea.h do
-      begin
-        if (i1 >= 0) and (i2 >= 0) and (i1 < 2304) and (i2 < 1152) then
+  begin
+    clearX1 := Max(0, rectarea.x);
+    clearY1 := Max(0, rectarea.y);
+    clearX2 := Min(2303, rectarea.x + rectarea.w);
+    clearY2 := Min(1151, rectarea.y + rectarea.h);
+    if (clearX1 <= clearX2) and (clearY1 <= clearY2) then
+      for i1 := clearX1 to clearX2 do
+        for i2 := clearY1 to clearY2 do
           MaskArray[i1, i2] := 0;
-      end;
+  end;
   if JudgeInScreen(px, py, w, h, xs, ys, RectArea.x, RectArea.y, RectArea.w, RectArea.h) then
   begin
     for iy := 1 to h do
